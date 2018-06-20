@@ -1,11 +1,11 @@
-///Generates a function that returns the quotient and remainder of unsigned integer division of `duo` by `div`. The function uses 3 different algorithms (and several conditionals for simple cases) that handle all numerical magnitudes efficiently. When run on most 64 bit cpus, it should be faster than binary long division for all cases except whenever `duo` and `div` are < ~8 bits in magnitude from the maximums or 0 of their type.
+///Generates a function that returns the quotient and remainder of unsigned integer division of `duo` by `div`. The function uses 3 different algorithms (and several conditionals for simple cases) that handle all numerical magnitudes efficiently. When run on most 64 bit CPUs, it should be faster than binary long division for all cases except whenever `duo` and `div` are < ~8 bits in magnitude from the maximums or 0 of their type.
 macro_rules! impl_all_all_div_rem_long {
     //$name: name of the function
     //$test_name: name of the test function
     //$Hty: unsigned integer with half the bit width of $ty
     //$h_n: the number of bits in $Hty.
     //Note: $h_n is used in bit shifts, so use a type that generates the best assembly for the target machine
-    //$ty: the largest unsigned integer that the targeted cpu can efficiently divide
+    //$ty: the largest division instruction that this function calls operates on this
     //$Dty: unsigned integer with double the bit width of $ty
 
     ($name:ident,$test_name:ident,$h_n:expr,$Hty:ident,$ty:ident,$Dty:ident,$($attribute:meta),*) => {
@@ -290,7 +290,6 @@ impl_all_all_div_rem_long!(u128_div_rem_long_inline_always,u128_div_rem_long_inl
 
 macro_rules! impl_more {
     ($ty:ident,$fn_div_rem_inline_always:ident,$name_div_only:ident,$name_rem_only:ident,$name_div_only_inline_always:ident,$name_rem_only_inline_always:ident) => {
-        #[no_mangle]
         pub fn $name_div_only(duo: $ty, div: $ty) -> $ty {
             $fn_div_rem_inline_always(duo,div).0
         }

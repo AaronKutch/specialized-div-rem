@@ -1,12 +1,13 @@
 **Specialized Division and Remainder Algorithms**
-Currently, only one alternative form of long division is provided in this crate that is faster than the functions provided by `std` in some cases.
+
+Currently, this crate provides an alternative form of long division that is faster than the functions provided by `std` in some cases.
 
 ## Potential Features
 Please file an issue or PR if you want to see these or others implemented.
 - Signed division
 - The algorithm could be extended to allow for faster 128 bit division on 32 bit hardware division capable computers, and more.
-- The algorithm has 3 different sections for different sized dividends that could be split up into their own specialized functions.
-- Every feature added multiplies the number of functions that must be supplied, so maybe it makes more sense to make the macros public so that users only make the functions they need.
+- The algorithm is actually 3 different algorithms for different sized dividends that could be split up into their own specialized functions.
+- Every feature added multiplies the number of functions that must be supplied, so maybe it makes more sense to make only the macros public so that users make only the functions they need.
 - Other algorithms could be included
 
 ## Performance
@@ -14,12 +15,13 @@ Setting the the flag for compilation to a native cpu makes a big difference for 
 On windows, run `set RUSTFLAGS= -C target-cpu=native` before `cargo bench`.
 When running `cargo bench` on this library, it runs division operations 1024 times on an array of random numbers.
 The `_long` benches are using the algorithm in this library and the `_std` benches are using the algorithms Rust is using for `/` and `%`.
-The `all_mid` stuff just specifies that all bits of `duo` are randomized and the least significant 3/4 bits of `div` are randomized, and the rest of the bits are 0 (`all` is 4/4 bits, `mid` is 3/4 bits, `lo` is 1/2 bits, and `0` is the lowest quarter of the input type).
+The `all_mid` stuff just specifies that all bits of `duo` are randomized and the least significant 3/4 bits of `div` are randomized, and the rest of the bits are 0 (`all` is all bits, `mid` is 3/4 bits, `lo` is half of the bits, and `0` is the lowest quarter of the bits of the input type).
 Additionally, when the benchmarks are run, some of the time per iteration is taken up by operations other than the division operation.
 The `_baseline` benchmarks approximate this time.
 
 On an AMD FX-9800P RADEON R7, the benchmarks look like this.
 Note that the u128_div_inline_always_all_lo_std benchmark (the most important one for me) takes 4.6x as much time as the long division one, and all of the other 128 benches show some kind of improvement.
+
 test constant_u128_div_rem_long              ... bench:       1,502 ns/iter (+/- 222)
 test constant_u128_div_rem_std               ... bench:       3,848 ns/iter (+/- 237)
 test u128_baseline                           ... bench:       1,102 ns/iter (+/- 116)
