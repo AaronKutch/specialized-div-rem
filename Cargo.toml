@@ -1,0 +1,16 @@
+[package]
+name = "specialized-div-rem"
+version = "0.0.0-alpha0"
+authors = ["Aaron Kutch <aaronkutch@att.net>"]
+publish = true
+
+description = "Specialized long division algorithms that are faster than binary long division on some cpus, especially 128 bit division on cpus with hardwired 64 bit division."
+repository = "https://github.com/AaronKutch/specialized-div-rem"
+documentation = "https://docs.rs/specialized-div-rem"
+readme = "README.md"
+keywords = ["division", "int", "integer", "numerics", "math"]
+categories = ["algorithms"]
+license = "MIT OR Apache-2.0"
+
+[dev-dependencies] # for benchmarks
+rand = {version = "0.5.1", features = ["i128_support"] }
