@@ -40,7 +40,7 @@ The `_baseline` benchmarks approximate this time.
 
 On an AMD FX-9800P RADEON R7, the benchmarks look like this.
 Note that all of the 128 bit benches show improvement of the long division over the one Rust is using.
-
+```
 test constant_u128_div_rem_long ... bench:       1,828 ns/iter (+/- 343)
 test constant_u128_div_rem_std  ... bench:       4,266 ns/iter (+/- 724)
 test i128_div_rem_all_mid_long  ... bench:      56,815 ns/iter (+/- 6,203)
@@ -61,3 +61,4 @@ test u128_div_rem_all_mid_std   ... bench:     420,950 ns/iter (+/- 3,330)
 test u128_rem_all_mid_long      ... bench:     116,793 ns/iter (+/- 1,717)
 test u128_rem_all_mid_std       ... bench:     396,252 ns/iter (+/- 2,055)
 (the 64 and 32 bit benches are not included here because the algorithm does not improve on these on this cpu)
+```
