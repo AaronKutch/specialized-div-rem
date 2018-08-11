@@ -1,7 +1,13 @@
 **Specialized Division and Remainder Algorithms**
 
-Currently, this crate provides an alternative form of long division that is faster than the functions provided by `std` in some cases.
-Note that setting the the flag for compilation to a native cpu and using LTO can make a decent performance improvement for these functions.
+Currently, this crate provides an alternative form of long division that is faster than the functions provided by `std` on some CPUs.
+Note that setting the the flag for compilation to a native cpu and using LTO can make a significant performance improvement for these functions.
+
+Most division algorithms end up doing most of the work to get both the quotient and remainder, which is why these functions return both (and the compiler can inline and optimize away unused results and calculations).
+
+On naming conventions:
+All `_div` functions should really be named `_quo` (quotient) functions, and it would stop the name collision with `div` for divisor, but to keep consistency with `std` it is kept as `_div`.
+`duo` is named as such because the variable is kept around and subtracted from inside division functions until it becomes the remainder (so it works as both the dividend and the remainder). This is more apparent when working with allocated big integers that use the input `duo` for intermediate storages and ends up as the remainder.
 
 ## Potential Features
 Please file an issue or PR if you want to see these or others implemented.
@@ -35,23 +41,23 @@ The `_baseline` benchmarks approximate this time.
 On an AMD FX-9800P RADEON R7, the benchmarks look like this.
 Note that all of the 128 bit benches show improvement of the long division over the one Rust is using.
 
-    test constant_u128_div_rem_long ... bench:       1,507 ns/iter (+/- 373)
-    test constant_u128_div_rem_std  ... bench:       4,650 ns/iter (+/- 156)
-    test i128_div_rem_all_mid_long  ... bench:      42,608 ns/iter (+/- 6,458)
-    test i128_div_rem_all_mid_std   ... bench:     166,380 ns/iter (+/- 4,349)
-    test u128_baseline              ... bench:       1,127 ns/iter (+/- 48)
-    test u128_div_all_0_long        ... bench:      41,588 ns/iter (+/- 2,333)
-    test u128_div_all_0_std         ... bench:     361,722 ns/iter (+/- 47,961)
-    test u128_div_all_all_long      ... bench:      13,466 ns/iter (+/- 1,362)
-    test u128_div_all_all_std       ... bench:      41,006 ns/iter (+/- 1,606)
-    test u128_div_all_mid_long      ... bench:      41,044 ns/iter (+/- 2,594)
-    test u128_div_all_mid_std       ... bench:     150,172 ns/iter (+/- 7,004)
-    test u128_div_rem_all_0_long    ... bench:      42,894 ns/iter (+/- 2,954)
-    test u128_div_rem_all_0_std     ... bench:     368,780 ns/iter (+/- 48,235)
-    test u128_div_rem_all_all_long  ... bench:      14,392 ns/iter (+/- 713)
-    test u128_div_rem_all_all_std   ... bench:      47,686 ns/iter (+/- 3,233)
-    test u128_div_rem_all_mid_long  ... bench:     105,274 ns/iter (+/- 978)
-    test u128_div_rem_all_mid_std   ... bench:     390,629 ns/iter (+/- 8,083)
-    test u128_rem_all_mid_long      ... bench:     104,386 ns/iter (+/- 3,699)
-    test u128_rem_all_mid_std       ... bench:     369,806 ns/iter (+/- 10,855)
-    (the 64 and 32 bit benches are not included here because the algorithm does not improve on these on this cpu)
+test constant_u128_div_rem_long ... bench:       1,828 ns/iter (+/- 343)
+test constant_u128_div_rem_std  ... bench:       4,266 ns/iter (+/- 724)
+test i128_div_rem_all_mid_long  ... bench:      56,815 ns/iter (+/- 6,203)
+test i128_div_rem_all_mid_std   ... bench:     196,299 ns/iter (+/- 31,057)
+test u128_baseline              ... bench:       1,198 ns/iter (+/- 185)
+test u128_div_all_0_long        ... bench:      46,872 ns/iter (+/- 8,351)
+test u128_div_all_0_std         ... bench:     465,996 ns/iter (+/- 25,411)
+test u128_div_all_all_long      ... bench:      19,235 ns/iter (+/- 3,263)
+test u128_div_all_all_std       ... bench:      45,792 ns/iter (+/- 57,229)
+test u128_div_all_mid_long      ... bench:     119,701 ns/iter (+/- 368)
+test u128_div_all_mid_std       ... bench:     400,679 ns/iter (+/- 1,763)
+test u128_div_rem_all_0_long    ... bench:     119,743 ns/iter (+/- 2,249)
+test u128_div_rem_all_0_std     ... bench:   1,005,042 ns/iter (+/- 9,824)
+test u128_div_rem_all_all_long  ... bench:      46,882 ns/iter (+/- 1,114)
+test u128_div_rem_all_all_std   ... bench:     120,155 ns/iter (+/- 2,642)
+test u128_div_rem_all_mid_long  ... bench:     119,386 ns/iter (+/- 1,668)
+test u128_div_rem_all_mid_std   ... bench:     420,950 ns/iter (+/- 3,330)
+test u128_rem_all_mid_long      ... bench:     116,793 ns/iter (+/- 1,717)
+test u128_rem_all_mid_std       ... bench:     396,252 ns/iter (+/- 2,055)
+(the 64 and 32 bit benches are not included here because the algorithm does not improve on these on this cpu)
