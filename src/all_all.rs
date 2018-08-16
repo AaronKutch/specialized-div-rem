@@ -170,6 +170,41 @@ macro_rules! impl_div_rem {
             //special long division algorithm. This algorithm only works with a very restricted
             //subset of the possible values of `duo` and `div`, hence why many special cases were
             //tested above
+            //Instead of clearing an average of 1.5 bits from `duo` per iteration via
+            //binary long division (assuming that the bits are random), an average of
+            //`h_n - 0.5` bits are cleared per iteration with this algorithm.
+            //It is a more complicated version of long division.
+            //For an example, consider the division of 76543210 by 213 and assume that `h_n`
+            //is equal to two decimal digits (note: we are working with base 10 here for
+            //readability). The first `h_n` part of the divisor (21) is taken and is incremented by
+            //1 to prevent oversubtraction.
+            //in the first step, the first `n` part of duo (7654) is divided by the 22 to make 347.
+            //We remember that there was one extra place not in the `h_n` part of the divisor and
+            //shift the 347 right by one, in contrast to a normal long division. The 347 is
+            //multiplied by the whole divisor to make 73911, and subtracted from duo to finish the
+            //step.
+            //    347
+            //  ________
+            // |76543210
+            // -73911
+            //   2632210
+            //two more steps are taken after this and then duo fits into an `ty`, and then a final
+            //normal long division step is made
+            //        14
+            //       443
+            //     119
+            //    347
+            //  ________
+            // |76543210
+            // -73911
+            //   2632210
+            //  -25347
+            //     97510
+            //    -94359
+            //      3151
+            //the tower at the top is added together to produce the quotient, 359357 (but in the
+            //actual algorithm, the quotient is progressively added to each step instead of at
+            //the end).
             let mut duo = duo;
             //the number of lesser significant bits not a part of `div_sig_n_h`. Has to be positive.
             let div_lesser_places = (n + $n_h).wrapping_sub(div_lz);
