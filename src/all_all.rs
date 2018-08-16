@@ -346,11 +346,12 @@ macro_rules! impl_div_rem {
                 let r0: u32 = $bit_selector_max & random::<u32>();
                 ones = 0;
                 for _ in 0..r0 {
-                    ones |= 1;
                     ones <<= 1;
+                    ones |= 1;
                 }
                 let r1: u32 = $bit_selector_max & random::<u32>();
-                let mask = (ones << r1) | (ones.wrapping_shr(n - r1));
+                //circular shift
+                let mask = (ones << r1) | (ones >> (((-(r1 as i32)) as u32) & (n - 1)));
                 match (random(),random(),random()) {
                     (false,false,false) => lhs |= mask,
                     (false,false,true) => lhs &= mask,
