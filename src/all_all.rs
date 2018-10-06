@@ -111,28 +111,37 @@ macro_rules! impl_div_rem {
             let rel_leading_sb = div_lz.wrapping_sub(duo_lz);
             //`mul` or `mul - 1` algorithm
             if rel_leading_sb < $n_h {
-                //Proof that `quo` can only be `mul` or `mul - 1`.
+                //TODO: fix this
+                //unfinished proof that `quo` can only be `mul` or `mul - 1`.
                 //disclaimer: this is not rigorous, and some parts are handwaved
                 //We are trying to find the quotient, `quo`.
-                //1. quo = duo / div.
+                //1. quo = duo / div. (definition)
                 //`shift` is the number of bits not in the higher `n` significant bits of `duo`
-                //2. shift = n - duo_lz.
-                //3. duo_sig_n = duo / 2^shift.
-                //4. div_sig_n = div / 2^shift.
-                //this is because of the bits less significant than the sig_n bits
+                //2. shift = n - duo_lz. (definition)
+                //3. duo_sig_n = duo / 2^shift. (definition)
+                //4. div_sig_n = div / 2^shift. (definition)
+                //this is because of the bits less significant than the sig_n bits that are cut off
+                //during the bit shift
                 //5. duo_sig_n * 2^shift <= duo < (duo_sig_n + 1) * 2^shift.
                 //6. div_sig_n * 2^shift <= div < (div_sig_n + 1) * 2^shift.
-                //dividing 5. by 6. (`duo / div` becomes `quo`, and to maintain the largest
-                //bounds the smallest bound of `duo` is divided by the largest bound of `div`, and
-                //the largest bound of `duo` is divided by the smallest bound of `div`, and the
-                //`2^n`s all cancel out)
+                //dividing each bound of 5. by each bound of 6.
+                //(duo_sig_n * 2^shift) / (div_sig_n * 2^shift)
+                //(duo_sig_n * 2^shift) / ((div_sig_n + 1) * 2^shift)
+                //((duo_sig_n + 1) * 2^shift) / (div_sig_n * 2^shift)
+                //((duo_sig_n + 1) * 2^shift) / ((div_sig_n + 1) * 2^shift)
+                //simplifying each of these four
+                //duo_sig_n / div_sig_n
+                //duo_sig_n / (div_sig_n + 1)
+                //(duo_sig_n + 1) / div_sig_n
+                //(duo_sig_n + 1) / (div_sig_n + 1)
+                //taking the smallest and the largest of these as the low and high bounds
+                //and replacing `duo / div` with `quo`
                 //7. duo_sig_n / (div_sig_n + 1) <= quo < (duo_sig_n + 1) / div_sig_n
-                //8. mul = duo_sig_n / div_sig_n.
+                //8. mul = duo_sig_n / div_sig_n. (definition)
                 //because of the range restraints on `duo_sig_n` and `div_sig_n` leading up to this,
                 //9. `duo_sig_n / (div_sig_n + 1)` can only be `mul` or `mul - 1`
                 //10. `(duo_sig_n + 1) / div_sig_n` can only be `mul` or `mul + 1`
                 //11.  mul - 1 <= quo < mul + 1
-
                 //Thus, we find the quotient using only an `n` sized divide to find `mul`
                 //and a `n` by `d_n` sized multiply and comparison to find if `quo * mul > duo`
                 let shift = n.wrapping_sub(duo_lz);
@@ -170,17 +179,17 @@ macro_rules! impl_div_rem {
             //special long division algorithm. This algorithm only works with a very restricted
             //subset of the possible values of `duo` and `div`, hence why many special cases were
             //tested above
-            //Instead of clearing an average of 1.5 bits from `duo` per iteration via
-            //binary long division (assuming that the bits are random), an average of
-            //`h_n - 0.5` bits are cleared per iteration with this algorithm.
+            //Instead of clearing a minimum of 1 bit from `duo` per iteration via
+            //binary long division, `n_h - 1` bits are cleared per iteration with this algorithm.
             //It is a more complicated version of long division.
-            //For an example, consider the division of 76543210 by 213 and assume that `h_n`
+            //For an example, consider the division of 76543210 by 213 and assume that `n_h`
             //is equal to two decimal digits (note: we are working with base 10 here for
-            //readability). The first `h_n` part of the divisor (21) is taken and is incremented by
+            //readability. I don't know if the algorithm breaks in general for non powers of two).
+            //The first `h_n` part of the divisor (21) is taken and is incremented by
             //1 to prevent oversubtraction.
             //in the first step, the first `n` part of duo (7654) is divided by the 22 to make 347.
-            //We remember that there was one extra place not in the `h_n` part of the divisor and
-            //shift the 347 right by one, in contrast to a normal long division. The 347 is
+            //We remember that there was 1 extra place not in the `n_h` part of the divisor and
+            //shift the 347 right by 1, in contrast to a normal long division. The 347 is
             //multiplied by the whole divisor to make 73911, and subtracted from duo to finish the
             //step.
             //    347
@@ -188,7 +197,7 @@ macro_rules! impl_div_rem {
             // |76543210
             // -73911
             //   2632210
-            //two more steps are taken after this and then duo fits into an `ty`, and then a final
+            //two more steps are taken after this and then duo fits into `n` bits, and then a final
             //normal long division step is made
             //        14
             //       443
@@ -205,6 +214,9 @@ macro_rules! impl_div_rem {
             //the tower at the top is added together to produce the quotient, 359357 (but in the
             //actual algorithm, the quotient is progressively added to each step instead of at
             //the end).
+            //In the actual algorithm below, instead of the final normal long division step, one of
+            //the three other algorithms ("quotient is 0 or 1", "mul or mul - 1", "n sized division"
+            //) is used.
             let mut duo = duo;
             //the number of lesser significant bits not a part of `div_sig_n_h`. Has to be positive.
             let div_lesser_places = (n + $n_h).wrapping_sub(div_lz);
@@ -385,8 +397,7 @@ macro_rules! impl_div_rem {
                     ones |= 1;
                 }
                 let r1: u32 = $bit_selector_max & random::<u32>();
-                //circular shift
-                let mask = (ones << r1) | (ones >> (((-(r1 as i32)) as u32) & (n - 1)));
+                let mask = ones.rotate_left(r1);
                 match (random(),random(),random()) {
                     (false,false,false) => lhs |= mask,
                     (false,false,true) => lhs &= mask,

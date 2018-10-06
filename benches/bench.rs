@@ -57,7 +57,7 @@ macro_rules! baseline_bencher {
         fn $name(bencher: &mut Bencher) {
             let (a, b) = black_box({
                 let (mut a, mut b): (Vec<$ty>, Vec<$ty>) = (Vec::new(), Vec::new());
-                for _ in 0..1024 {
+                for _ in 0..32 {
                     let temp0: $ty = random();
                     a.push(temp0);
                     let temp1: $ty = random();
@@ -70,11 +70,13 @@ macro_rules! baseline_bencher {
                 (a, b)
             });
             bencher.iter(|| {
-                a.iter()
-                    .enumerate()
-                    .fold(($ty_zero, $ty_zero), |(sum0, sum1), x| {
-                        (sum0.wrapping_add(b[x.0]), sum1.wrapping_sub(b[x.0]))
-                    })
+                let mut s0 = 0;
+                let mut s1 = 0;
+                for i in 0..a.len() {
+                    s0 += a[i].wrapping_add(b[i]);
+                    s1 += a[i].wrapping_sub(b[i]);
+                }
+                (s0, s1)
             })
         }
     };
@@ -108,7 +110,7 @@ macro_rules! std_and_long_bencher {
         fn $name_std(bencher: &mut Bencher) {
             let (a,b) = black_box({
                 let (mut a,mut b): (Vec<$ty>,Vec<$ty>) = (Vec::new(),Vec::new());
-                for _ in 0..1024 {
+                for _ in 0..32 {
                     let temp0: $ty = random();
                     a.push(temp0 & ($ty::MAX >> ($ty_bits - $arg0_sb)));
                     let temp1: $ty = random();
@@ -121,12 +123,14 @@ macro_rules! std_and_long_bencher {
                 (a,b)
             });
             bencher.iter(|| {
+                let mut s0 = 0;
+                let mut s1 = 0;
                 match $fn_kind {
-                    FnKind::DivRem => a.iter().enumerate().fold(($ty_zero,$ty_zero),|(sum0,sum1), x| {(sum0.wrapping_add(x.1 / b[x.0]),sum1.wrapping_add(x.1 % b[x.0]))}),
-                    //sum1 just exists here to make the return types of the match arms equal
-                    FnKind::Div => a.iter().enumerate().fold(($ty_zero,$ty_zero),|(sum0,sum1), x| {(sum0.wrapping_add(x.1 / b[x.0]),sum1)}),
-                    FnKind::Rem => a.iter().enumerate().fold(($ty_zero,$ty_zero),|(sum0,sum1), x| {(sum0,sum1.wrapping_add(x.1 % b[x.0]))}),
+                    FnKind::DivRem => for i in 0..a.len() {s0 += a[i] / b[i]; s1 += a[i] % b[i];},
+                    FnKind::Div => for i in 0..a.len() {s0 += a[i] / b[i];},
+                    FnKind::Rem => for i in 0..a.len() {s1 += a[i] % b[i];},
                 }
+                (s0, s1)
             })
         }
 
@@ -134,7 +138,7 @@ macro_rules! std_and_long_bencher {
         fn $name_long(bencher: &mut Bencher) {
             let (a,b) = black_box({
                 let (mut a,mut b): (Vec<$ty>,Vec<$ty>) = (Vec::new(),Vec::new());
-                for _ in 0..1024 {
+                for _ in 0..32 {
                     let temp0: $ty = random();
                     a.push(temp0 & ($ty::MAX >> ($ty_bits - $arg0_sb)));
                     let temp1: $ty = random();
@@ -147,17 +151,14 @@ macro_rules! std_and_long_bencher {
                 (a,b)
             });
             bencher.iter(|| {
+                let mut s0 = 0;
+                let mut s1 = 0;
                 match $fn_kind {
-                    FnKind::DivRem => a.iter().enumerate().fold(($ty_zero,$ty_zero),|(sum0,sum1), x| {
-                        let temp = $fn(*x.1,b[x.0]);
-                        (sum0.wrapping_add(temp.0),sum1.wrapping_add(temp.1))
-                    }),
-                    //to prevent a lot of code duplication, I used the inline div_rem functions and used only one field from them (which is exactly what is used to define the div and rem only functions).
-                    FnKind::Div => a.iter().enumerate().fold(($ty_zero,$ty_zero),|(sum0,sum1), x| {(
-                        sum0.wrapping_add($fn(*x.1,b[x.0]).0),sum1)}),
-                    FnKind::Rem => a.iter().enumerate().fold(($ty_zero,$ty_zero),|(sum0,sum1), x| {(sum0,
-                        sum1.wrapping_add($fn(*x.1,b[x.0]).1))}),
+                    FnKind::DivRem => for i in 0..a.len() {let temp = $fn(a[i],b[i]); s0 += temp.0; s1 += temp.1;},
+                    FnKind::Div => for i in 0..a.len() {s0 += $fn(a[i],b[i]).0;},
+                    FnKind::Rem => for i in 0..a.len() {s1 += $fn(a[i],b[i]).1;},
                 }
+                (s0, s1)
             })
         }
     };
