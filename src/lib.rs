@@ -10,4 +10,4 @@ extern crate rand;
 
 mod all_all;
 
-pub use all_all::*;
+pub use self::all_all::*;

@@ -1,5 +1,4 @@
 #![feature(test)]
-extern crate rand;
 extern crate test;
 use rand::prelude::*;
 use std::{i128, u128, u32, u64};
@@ -58,13 +57,13 @@ macro_rules! baseline_bencher {
             let (a, b) = black_box({
                 let (mut a, mut b): (Vec<$ty>, Vec<$ty>) = (Vec::new(), Vec::new());
                 for _ in 0..32 {
-                    let temp0: $ty = random();
-                    a.push(temp0);
-                    let temp1: $ty = random();
-                    if temp1 == $ty_zero {
+                    let tmp0: $ty = random();
+                    a.push(tmp0);
+                    let tmp1: $ty = random();
+                    if tmp1 == $ty_zero {
                         b.push($ty_one);
                     } else {
-                        b.push(temp1);
+                        b.push(tmp1);
                     }
                 }
                 (a, b)
@@ -111,13 +110,13 @@ macro_rules! std_and_long_bencher {
             let (a,b) = black_box({
                 let (mut a,mut b): (Vec<$ty>,Vec<$ty>) = (Vec::new(),Vec::new());
                 for _ in 0..32 {
-                    let temp0: $ty = random();
-                    a.push(temp0 & ($ty::MAX >> ($ty_bits - $arg0_sb)));
-                    let temp1: $ty = random();
-                    if temp1 == $ty_zero {
+                    let tmp0: $ty = random();
+                    a.push(tmp0 & ($ty::MAX >> ($ty_bits - $arg0_sb)));
+                    let tmp1: $ty = random();
+                    if tmp1 == $ty_zero {
                         b.push($ty_one);
                     } else {
-                        b.push(temp1 & ($ty::MAX >> ($ty_bits - $arg1_sb)));
+                        b.push(tmp1 & ($ty::MAX >> ($ty_bits - $arg1_sb)));
                     }
                 }
                 (a,b)
@@ -139,13 +138,13 @@ macro_rules! std_and_long_bencher {
             let (a,b) = black_box({
                 let (mut a,mut b): (Vec<$ty>,Vec<$ty>) = (Vec::new(),Vec::new());
                 for _ in 0..32 {
-                    let temp0: $ty = random();
-                    a.push(temp0 & ($ty::MAX >> ($ty_bits - $arg0_sb)));
-                    let temp1: $ty = random();
-                    if temp1 == $ty_zero {
+                    let tmp0: $ty = random();
+                    a.push(tmp0 & ($ty::MAX >> ($ty_bits - $arg0_sb)));
+                    let tmp1: $ty = random();
+                    if tmp1 == $ty_zero {
                         b.push($ty_one);
                     } else {
-                        b.push(temp1 & ($ty::MAX >> ($ty_bits - $arg1_sb)));
+                        b.push(tmp1 & ($ty::MAX >> ($ty_bits - $arg1_sb)));
                     }
                 }
                 (a,b)
@@ -154,7 +153,7 @@ macro_rules! std_and_long_bencher {
                 let mut s0 = 0;
                 let mut s1 = 0;
                 match $fn_kind {
-                    FnKind::DivRem => for i in 0..a.len() {let temp = $fn(a[i],b[i]); s0 += temp.0; s1 += temp.1;},
+                    FnKind::DivRem => for i in 0..a.len() {let tmp = $fn(a[i],b[i]); s0 += tmp.0; s1 += tmp.1;},
                     FnKind::Div => for i in 0..a.len() {s0 += $fn(a[i],b[i]).0;},
                     FnKind::Rem => for i in 0..a.len() {s1 += $fn(a[i],b[i]).1;},
                 }
@@ -298,6 +297,18 @@ std_and_long_bencher!(
     128,
     u128_div_all_all_std,
     u128_div_all_all_long
+);
+std_and_long_bencher!(
+    u128_div_rem,
+    FnKind::DivRem,
+    u128,
+    128,
+    0u128,
+    1u128,
+    128,
+    64,
+    u128_div_rem_all_lo_std,
+    u128_div_rem_all_lo_long
 );
 std_and_long_bencher!(
     u128_div_rem,
