@@ -34,7 +34,7 @@ fn constant_u128_div_rem_std(bencher: &mut Bencher) {
 }
 
 #[bench]
-fn constant_u128_div_rem_long(bencher: &mut Bencher) {
+fn constant_u128_div_rem_new(bencher: &mut Bencher) {
     let a = black_box(C);
     bencher.iter(|| {
         let mut sum0 = 0u128;
@@ -91,8 +91,13 @@ enum FnKind {
     Rem,
 }
 
-//produces two benchmarking functions that iterates a standard rust operation and an alternative operation on an precomputed array of 1024 random integers.The iterator is passed to a `Bencher`, and when `cargo bench` is used, it returns the time to do all 1024 operations. Note that some time is taken to lookup the array values and add the result of the operation, so subtract the appropriate `{}_baseline` values to find a closer value to how long the operations themselves actually take.
-macro_rules! std_and_long_bencher {
+// produces two benchmarking functions that iterates a standard rust operation and an alternative
+// operation on an precomputed array of 32 random integers.The iterator is passed to a `Bencher`,
+// and when `cargo bench` is used, it returns the time to do all 1024 operations. Note that some
+// time is taken to lookup the array values and add the result of the operation, so subtract the
+// appropriate `{}_baseline` values to find a closer value to how long the operations themselves
+// actually take.
+macro_rules! std_and_new_bencher {
     (
         $fn:ident, //the special division operation
         $fn_kind:expr, //this is to reduce repeated macro code, it specifies what the operation is
@@ -103,7 +108,7 @@ macro_rules! std_and_long_bencher {
         $arg0_sb:expr, //the number of significant random bits in argument 0 to the operation
         $arg1_sb:expr, //the number of significant bits in argument 1 to the operation. Note: argument 1 is set to 1 if the random number generator returns zero
         $name_std:ident, //name of the benchmarking function that uses the standard Rust operations
-        $name_long:ident //name of the benchmarking function that uses another operation
+        $name_new:ident //name of the benchmarking function that uses another operation
     ) => {
         #[bench]
         fn $name_std(bencher: &mut Bencher) {
@@ -134,7 +139,7 @@ macro_rules! std_and_long_bencher {
         }
 
         #[bench]
-        fn $name_long(bencher: &mut Bencher) {
+        fn $name_new(bencher: &mut Bencher) {
             let (a,b) = black_box({
                 let (mut a,mut b): (Vec<$ty>,Vec<$ty>) = (Vec::new(),Vec::new());
                 for _ in 0..32 {
@@ -163,7 +168,7 @@ macro_rules! std_and_long_bencher {
     };
 }
 
-std_and_long_bencher!(
+std_and_new_bencher!(
     u32_div_rem,
     FnKind::DivRem,
     u32,
@@ -173,9 +178,9 @@ std_and_long_bencher!(
     32,
     32 - 8,
     u32_div_rem_all_mid_std,
-    u32_div_rem_all_mid_long
+    u32_div_rem_all_mid_new
 );
-std_and_long_bencher!(
+std_and_new_bencher!(
     u64_div_rem,
     FnKind::DivRem,
     u64,
@@ -185,9 +190,9 @@ std_and_long_bencher!(
     64,
     64 - 16,
     u64_div_rem_all_mid_std,
-    u64_div_rem_all_mid_long
+    u64_div_rem_all_mid_new
 );
-std_and_long_bencher!(
+std_and_new_bencher!(
     u128_div_rem,
     FnKind::DivRem,
     u128,
@@ -197,9 +202,9 @@ std_and_long_bencher!(
     128,
     128 - 32,
     u128_div_rem_all_mid_std,
-    u128_div_rem_all_mid_long
+    u128_div_rem_all_mid_new
 );
-std_and_long_bencher!(
+std_and_new_bencher!(
     i128_div_rem,
     FnKind::DivRem,
     i128,
@@ -209,10 +214,10 @@ std_and_long_bencher!(
     128,
     128 - 32,
     i128_div_rem_all_mid_std,
-    i128_div_rem_all_mid_long
+    i128_div_rem_all_mid_new
 );
 
-std_and_long_bencher!(
+std_and_new_bencher!(
     u32_div_rem,
     FnKind::Div,
     u32,
@@ -222,9 +227,9 @@ std_and_long_bencher!(
     32,
     32 - 8,
     u32_div_all_mid_std,
-    u32_div_all_mid_long
+    u32_div_all_mid_new
 );
-std_and_long_bencher!(
+std_and_new_bencher!(
     u64_div_rem,
     FnKind::Div,
     u64,
@@ -234,9 +239,9 @@ std_and_long_bencher!(
     64,
     64 - 16,
     u64_div_all_mid_std,
-    u64_div_all_mid_long
+    u64_div_all_mid_new
 );
-std_and_long_bencher!(
+std_and_new_bencher!(
     u128_div_rem,
     FnKind::Div,
     u128,
@@ -246,10 +251,10 @@ std_and_long_bencher!(
     128,
     128 - 32,
     u128_div_all_mid_std,
-    u128_div_all_mid_long
+    u128_div_all_mid_new
 );
 
-std_and_long_bencher!(
+std_and_new_bencher!(
     u128_div_rem,
     FnKind::Rem,
     u128,
@@ -259,10 +264,10 @@ std_and_long_bencher!(
     128,
     128 - 32,
     u128_rem_all_mid_std,
-    u128_rem_all_mid_long
+    u128_rem_all_mid_new
 );
 
-std_and_long_bencher!(
+std_and_new_bencher!(
     u128_div_rem,
     FnKind::DivRem,
     u128,
@@ -272,9 +277,9 @@ std_and_long_bencher!(
     128,
     128,
     u128_div_rem_all_all_std,
-    u128_div_rem_all_all_long
+    u128_div_rem_all_all_new
 );
-std_and_long_bencher!(
+std_and_new_bencher!(
     u128_div_rem,
     FnKind::DivRem,
     u128,
@@ -284,9 +289,9 @@ std_and_long_bencher!(
     128,
     32,
     u128_div_rem_all_0_std,
-    u128_div_rem_all_0_long
+    u128_div_rem_all_0_new
 );
-std_and_long_bencher!(
+std_and_new_bencher!(
     u128_div_rem,
     FnKind::Div,
     u128,
@@ -296,9 +301,9 @@ std_and_long_bencher!(
     128,
     128,
     u128_div_all_all_std,
-    u128_div_all_all_long
+    u128_div_all_all_new
 );
-std_and_long_bencher!(
+std_and_new_bencher!(
     u128_div_rem,
     FnKind::DivRem,
     u128,
@@ -308,9 +313,9 @@ std_and_long_bencher!(
     128,
     64,
     u128_div_rem_all_lo_std,
-    u128_div_rem_all_lo_long
+    u128_div_rem_all_lo_new
 );
-std_and_long_bencher!(
+std_and_new_bencher!(
     u128_div_rem,
     FnKind::Div,
     u128,
@@ -320,5 +325,5 @@ std_and_long_bencher!(
     128,
     32,
     u128_div_all_0_std,
-    u128_div_all_0_long
+    u128_div_all_0_new
 );

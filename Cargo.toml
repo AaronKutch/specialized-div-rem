@@ -14,4 +14,4 @@ categories = ["algorithms", "no-std"]
 license = "MIT OR Apache-2.0"
 
 [dev-dependencies] # for benchmarks
-rand = {version = "0.6.4", features = ["i128_support"] }
+rand = {version = "0.6.5", features = ["i128_support"] }

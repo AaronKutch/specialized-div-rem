@@ -1,3 +1,14 @@
+#[cfg(target_arch = "x86_64")]
+unsafe fn divrem_128_by_64(duo: u128, div: u128) -> (u128, u128) {
+    let quo: u64;
+    let rem: u64;
+    asm!("divq $0"
+        : "={rax}"(quo), "={rdx}"(rem)
+        : "{rax}"(duo as u64), "{rdx}"((duo >> 64) as u64), "0"(div as u64)
+    );
+    return (quo as u128, rem as u128)
+}
+
 /// Generates a function that returns the quotient and remainder of unsigned integer division of
 /// `duo` by `div`. The function uses 3 different algorithms (and several conditionals for simple
 /// cases) that handle almost all numerical magnitudes efficiently.
@@ -13,7 +24,8 @@ macro_rules! impl_div_rem {
         $iD:ident, //signed version of $uD
         $bit_selector_max:expr, //the max value of the smallest bit string needed to index the bits of an $uD
         $($unsigned_attr:meta),*; //attributes for the unsigned function
-        $($signed_attr:meta),* //attributes for the signed function
+        $($signed_attr:meta),*; //attributes for the signed function
+        $n_d_by_n_division:tt
     ) => {
         //wrapping_{} was used everywhere for better performance when compiling with
         //`debug-assertions = true`
@@ -82,6 +94,14 @@ macro_rules! impl_div_rem {
                     (duo as $uX).wrapping_rem(div as $uX) as $uD
                 )
             }
+            
+            //relative leading significant bits, cannot be negative
+            let rel_leading_sb = div_lz.wrapping_sub(duo_lz);
+
+            /*if (n_d == 128) && (rel_leading_sb < n) && (div_lz >= n) {
+                return unsafe { $n_d_by_n_division(duo, div) };
+            }*/
+
             //`{2^n, 2^div_sb} <= duo < 2^n_d`
             //`1 <= div < {2^duo_sb, 2^(n_d - 1)}`
             //regular long division algorithm
@@ -112,8 +132,6 @@ macro_rules! impl_div_rem {
             }
             //`{2^n, 2^div_sb} <= duo < 2^n_d`
             //`2^n_h <= div < {2^duo_sb, 2^(n_d - 1)}`
-            //relative leading significant bits, cannot be negative
-            let rel_leading_sb = div_lz.wrapping_sub(duo_lz);
             //`mul` or `mul - 1` algorithm
             if rel_leading_sb < $n_h {
                 //TODO: fix this
@@ -439,6 +457,8 @@ macro_rules! impl_div_rem {
     }
 }
 
-impl_div_rem!(u32_div_rem, i32_div_rem, u32_i32_div_rem_test, 8u32, u8, u16, u32, i32, 0b11111u32, inline; inline, doc = "Note that unlike some of Rust's division functions, `i32_div_rem(i32::MIN,-1)` will not panic but instead overflow and produce the correct truncated two's complement `(i32::MIN,0)`.");
-impl_div_rem!(u64_div_rem, i64_div_rem, u64_i64_div_rem_test, 16u32, u16, u32, u64, i64, 0b111111u32, inline; inline, doc = "Note that unlike some of Rust's division functions, `i64_div_rem(i64::MIN,-1)` will not panic but instead overflow and produce the correct truncated two's complement `(i64::MIN,0)`.");
-impl_div_rem!(u128_div_rem, i128_div_rem, u128_i128_div_rem_test, 32u32, u32, u64, u128, i128, 0b1111111u32, inline; inline, doc = "Note that unlike some of Rust's division functions, `i128_div_rem(i128::MIN,-1)` will not panic but instead overflow and produce the correct truncated two's complement `(i128::MIN,0)`.");
+impl_div_rem!(u32_div_rem, i32_div_rem, u32_i32_div_rem_test, 8u32, u8, u16, u32, i32, 0b11111u32, inline; inline, doc = "Note that unlike some of Rust's division functions, `i32_div_rem(i32::MIN,-1)` will not panic but instead overflow and produce the correct truncated two's complement `(i32::MIN,0)`.";{});
+impl_div_rem!(u64_div_rem, i64_div_rem, u64_i64_div_rem_test, 16u32, u16, u32, u64, i64, 0b111111u32, inline; inline, doc = "Note that unlike some of Rust's division functions, `i64_div_rem(i64::MIN,-1)` will not panic but instead overflow and produce the correct truncated two's complement `(i64::MIN,0)`.";{});
+impl_div_rem!(u128_div_rem, i128_div_rem, u128_i128_div_rem_test, 32u32, u32, u64, u128, i128, 0b1111111u32, inline(never); inline, doc = "Note that unlike some of Rust's division functions, `i128_div_rem(i128::MIN,-1)` will not panic but instead overflow and produce the correct truncated two's complement `(i128::MIN,0)`.";
+    divrem_128_by_64
+);
