@@ -112,8 +112,8 @@ macro_rules! std_and_new_bencher {
     ) => {
         #[bench]
         fn $name_std(bencher: &mut Bencher) {
-            let (a,b) = black_box({
-                let (mut a,mut b): (Vec<$ty>,Vec<$ty>) = (Vec::new(),Vec::new());
+            let (a, b) = black_box({
+                let (mut a, mut b): (Vec<$ty>, Vec<$ty>) = (Vec::new(), Vec::new());
                 for _ in 0..32 {
                     let tmp0: $ty = random();
                     a.push(tmp0 & ($ty::MAX >> ($ty_bits - $arg0_sb)));
@@ -124,15 +124,28 @@ macro_rules! std_and_new_bencher {
                         b.push(tmp1 & ($ty::MAX >> ($ty_bits - $arg1_sb)));
                     }
                 }
-                (a,b)
+                (a, b)
             });
             bencher.iter(|| {
                 let mut s0 = 0;
                 let mut s1 = 0;
                 match $fn_kind {
-                    FnKind::DivRem => for i in 0..a.len() {s0 += a[i] / b[i]; s1 += a[i] % b[i];},
-                    FnKind::Div => for i in 0..a.len() {s0 += a[i] / b[i];},
-                    FnKind::Rem => for i in 0..a.len() {s1 += a[i] % b[i];},
+                    FnKind::DivRem => {
+                        for i in 0..a.len() {
+                            s0 += a[i] / b[i];
+                            s1 += a[i] % b[i];
+                        }
+                    }
+                    FnKind::Div => {
+                        for i in 0..a.len() {
+                            s0 += a[i] / b[i];
+                        }
+                    }
+                    FnKind::Rem => {
+                        for i in 0..a.len() {
+                            s1 += a[i] % b[i];
+                        }
+                    }
                 }
                 (s0, s1)
             })
@@ -140,8 +153,8 @@ macro_rules! std_and_new_bencher {
 
         #[bench]
         fn $name_new(bencher: &mut Bencher) {
-            let (a,b) = black_box({
-                let (mut a,mut b): (Vec<$ty>,Vec<$ty>) = (Vec::new(),Vec::new());
+            let (a, b) = black_box({
+                let (mut a, mut b): (Vec<$ty>, Vec<$ty>) = (Vec::new(), Vec::new());
                 for _ in 0..32 {
                     let tmp0: $ty = random();
                     a.push(tmp0 & ($ty::MAX >> ($ty_bits - $arg0_sb)));
@@ -152,15 +165,29 @@ macro_rules! std_and_new_bencher {
                         b.push(tmp1 & ($ty::MAX >> ($ty_bits - $arg1_sb)));
                     }
                 }
-                (a,b)
+                (a, b)
             });
             bencher.iter(|| {
                 let mut s0 = 0;
                 let mut s1 = 0;
                 match $fn_kind {
-                    FnKind::DivRem => for i in 0..a.len() {let tmp = $fn(a[i],b[i]); s0 += tmp.0; s1 += tmp.1;},
-                    FnKind::Div => for i in 0..a.len() {s0 += $fn(a[i],b[i]).0;},
-                    FnKind::Rem => for i in 0..a.len() {s1 += $fn(a[i],b[i]).1;},
+                    FnKind::DivRem => {
+                        for i in 0..a.len() {
+                            let tmp = $fn(a[i], b[i]);
+                            s0 += tmp.0;
+                            s1 += tmp.1;
+                        }
+                    }
+                    FnKind::Div => {
+                        for i in 0..a.len() {
+                            s0 += $fn(a[i], b[i]).0;
+                        }
+                    }
+                    FnKind::Rem => {
+                        for i in 0..a.len() {
+                            s1 += $fn(a[i], b[i]).1;
+                        }
+                    }
                 }
                 (s0, s1)
             })

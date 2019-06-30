@@ -6,7 +6,7 @@ unsafe fn divrem_128_by_64(duo: u128, div: u128) -> (u128, u128) {
         : "={rax}"(quo), "={rdx}"(rem)
         : "{rax}"(duo as u64), "{rdx}"((duo >> 64) as u64), "0"(div as u64)
     );
-    return (quo as u128, rem as u128)
+    return (quo as u128, rem as u128);
 }
 
 /// Generates a function that returns the quotient and remainder of unsigned integer division of
@@ -32,9 +32,9 @@ macro_rules! impl_div_rem {
 
         /// Computes the quotient and remainder of `duo` divided by `div` and returns them as a
         /// tuple.
-        /// 
+        ///
         /// # Panics
-        /// 
+        ///
         /// When attempting to divide by zero, this function will panic.
         $(
             #[$unsigned_attr]
@@ -96,7 +96,7 @@ macro_rules! impl_div_rem {
                     (duo as $uX).wrapping_rem(div as $uX) as $uD
                 )
             }
-            
+
             // relative leading significant bits, cannot be negative because of above branches
             let rel_leading_sb = div_lz.wrapping_sub(duo_lz);
 
@@ -200,7 +200,7 @@ macro_rules! impl_div_rem {
                 // off by the shift can only affect `quo` enough to change it between two values.
                 //
                 // Suppose `duo_sig_n` is 2^7 and `div_sig_n` is 2^4. If we then try (2^7 + 1)/2^4
-                // and 2^7/(2^4 + 1) we see that it is 8 or 7, which matches 2^7/2^4 and 
+                // and 2^7/(2^4 + 1) we see that it is 8 or 7, which matches 2^7/2^4 and
                 // (2^7/2^4) - 1.
                 // Some other examples:
                 // (2^7 + 2^6 + 2^5 + 2^4)/(2^4) = 15
@@ -372,7 +372,7 @@ macro_rules! impl_div_rem {
                         )
                     }
                 }
-                
+
                 // This can only happen if `div_sd < n` (because of previous "quo = 0 or 1"
                 // branches), but it is not worth it to unroll further.
                 if duo_lz >= n {
@@ -387,9 +387,9 @@ macro_rules! impl_div_rem {
 
         /// Computes the quotient and remainder of `duo` divided by `div` and returns them as a
         /// tuple.
-        /// 
+        ///
         /// # Panics
-        /// 
+        ///
         /// When attempting to divide by zero, this function will panic.
         $(
             #[$signed_attr]
