@@ -35,12 +35,12 @@ Benchmarks vary based on the numerical size of the numbers being entered, and fo
     - `_all_mid` means that all the bits of `duo` are random and the lower 3/4 bits of `div` are random (the higher 1/4 of the bits are zero),
     - `_all_0` means that all the bits of `duo` are random and the lower 1/4 bits of `div` are random
 
-The `_long` benches are using the algorithm in this library and the `_std` benches are using the algorithms Rust is using for `/` and `%`.
+The `_new` benches are using the algorithm in this library and the `_std` benches are using the algorithms Rust is using for `/` and `%`.
 
 Additionally, when the benchmarks are run, some of the time per iteration is taken up by operations other than the division operation.
 The `_baseline` benchmarks approximate this time.
 
-On an AMD FX-9800P RADEON R7, the benchmarks look like this. There is probably CPU throttling happening here, but a separate benchmark on an Intel CPU using Docker shows approximately the same ratios between `_long` and `_std`.
+On an AMD FX-9800P RADEON R7, the benchmarks look like this.
 Note that all of the 128 bit benches show improvement of the long division over the one Rust is using.
 
 ```
@@ -66,4 +66,29 @@ test u128_div_rem_all_mid_std   ... bench:       5,191 ns/iter (+/- 1,501)
 test u128_rem_all_mid_long      ... bench:       1,331 ns/iter (+/- 224)
 test u128_rem_all_mid_std       ... bench:       4,928 ns/iter (+/- 933)
 (the 64 and 32 bit benches are not included here because the algorithm does not improve on these on this cpu)
+```
+
+On an Intel i3-3240,
+```
+test constant_u128_div_rem_new ... bench:       1,379 ns/iter (+/- 706)
+test constant_u128_div_rem_std ... bench:       3,126 ns/iter (+/- 1,127)
+test i128_div_rem_all_mid_new  ... bench:       1,021 ns/iter (+/- 29)
+test i128_div_rem_all_mid_std  ... bench:       3,848 ns/iter (+/- 234)
+test u128_baseline             ... bench:          67 ns/iter (+/- 23)
+test u128_div_all_0_new        ... bench:       1,103 ns/iter (+/- 8)
+test u128_div_all_0_std        ... bench:       9,360 ns/iter (+/- 313)
+test u128_div_all_all_new      ... bench:         457 ns/iter (+/- 560)
+test u128_div_all_all_std      ... bench:         735 ns/iter (+/- 829)
+test u128_div_all_mid_new      ... bench:         992 ns/iter (+/- 921)
+test u128_div_all_mid_std      ... bench:       3,513 ns/iter (+/- 1,885)
+test u128_div_rem_all_0_new    ... bench:       1,146 ns/iter (+/- 573)
+test u128_div_rem_all_0_std    ... bench:       9,438 ns/iter (+/- 276)
+test u128_div_rem_all_all_new  ... bench:         513 ns/iter (+/- 41)
+test u128_div_rem_all_all_std  ... bench:         828 ns/iter (+/- 611)
+test u128_div_rem_all_lo_new   ... bench:       1,704 ns/iter (+/- 85)
+test u128_div_rem_all_lo_std   ... bench:       6,648 ns/iter (+/- 207)
+test u128_div_rem_all_mid_new  ... bench:       1,077 ns/iter (+/- 67)
+test u128_div_rem_all_mid_std  ... bench:       3,732 ns/iter (+/- 2,858)
+test u128_rem_all_mid_new      ... bench:       1,136 ns/iter (+/- 70)
+test u128_rem_all_mid_std      ... bench:       3,629 ns/iter (+/- 895)
 ```

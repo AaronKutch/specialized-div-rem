@@ -232,6 +232,18 @@ std_and_new_bencher!(
     u128_div_rem_all_mid_new
 );
 std_and_new_bencher!(
+    u128_div_rem,
+    FnKind::DivRem,
+    u128,
+    128,
+    0u128,
+    1u128,
+    110,
+    64,
+    u128_div_rem_110_64_std,
+    u128_div_rem_110_64_new
+);
+std_and_new_bencher!(
     i128_div_rem,
     FnKind::DivRem,
     i128,

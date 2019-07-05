@@ -1,13 +1,30 @@
+#[cfg(not(target_arch = "x86_64"))]
+#[inline]
+unsafe fn divrem_128_by_64(duo: u128, div: u64) -> (u64, u64) {
+    let quo = duo.wrapping_div(div as u128);
+    let rem = duo.wrapping_rem(div as u128);
+    return (quo as u64, rem as u64);
+}
+
+/// This function is unsafe, because if the quotient of `duo` and `div` does not fit in a `u64`,
+/// a floating point exception is thrown.
 #[cfg(target_arch = "x86_64")]
-unsafe fn divrem_128_by_64(duo: u128, div: u128) -> (u128, u128) {
+#[inline]
+unsafe fn divrem_128_by_64(duo: u128, div: u64) -> (u64, u64) {
     let quo: u64;
     let rem: u64;
-    asm!("divq $0"
+    let duo_lo = duo as u64;
+    let duo_hi = (duo >> 64) as u64;
+    asm!("divq $4"
         : "={rax}"(quo), "={rdx}"(rem)
-        : "{rax}"(duo as u64), "{rdx}"((duo >> 64) as u64), "0"(div as u64)
+        : "{rax}"(duo_lo), "{rdx}"(duo_hi), "r"(div)
+        : "rax", "rdx"
     );
-    return (quo as u128, rem as u128);
+    return (quo, rem);
 }
+
+unsafe fn dummy_64(duo: u64, div: u32) -> (u32, u32) {(duo as u32, div)}
+unsafe fn dummy_32(duo: u32, div: u16) -> (u16, u16) {(duo as u16, div)}
 
 /// Generates a function that returns the quotient and remainder of unsigned integer division of
 /// `duo` by `div`. The function uses 3 different algorithms (and several conditionals for simple
@@ -25,10 +42,12 @@ macro_rules! impl_div_rem {
         $bit_selector_max:expr, //the max value of the smallest bit string needed to index the bits of an $uD
         $($unsigned_attr:meta),*; //attributes for the unsigned function
         $($signed_attr:meta),*; //attributes for the signed function
-        $n_d_by_n_division:tt
+        $use_n_d_by_n_division:expr,
+        $n_d_by_n_division:ident
     ) => {
         //wrapping_{} was used everywhere for better performance when compiling with
         //`debug-assertions = true`
+        //TODO if and when `carrying_mul` (rust-lang rfc #2417) is stabilized, this can be fixed
 
         /// Computes the quotient and remainder of `duo` divided by `div` and returns them as a
         /// tuple.
@@ -40,7 +59,8 @@ macro_rules! impl_div_rem {
             #[$unsigned_attr]
         )*
         pub fn $unsigned_name(duo: $uD, div: $uD) -> ($uD,$uD) {
-            //TODO if and when `carrying_mul` (rust-lang rfc #2417) is stabilized, this can be fixed
+
+            // LLVM correctly optimizes this to use a widening multiply to 128 bits
             #[inline(always)]
             pub fn carrying_mul(lhs: $uX, rhs: $uX) -> ($uX, $uX) {
                 let tmp = (lhs as $uD).wrapping_mul(rhs as $uD);
@@ -63,8 +83,6 @@ macro_rules! impl_div_rem {
 
             // the number of bits in a $uX
             let n = $n_h * 2;
-            // the number of bits in a $uD
-            let n_d = n * 2;
 
             // Note that throughout this function, `lo` and `hi` refer to the high and low `n` bits
             // of a `$uD`, `0` to `3` refer to the 4 `n_h` bit parts of a `$uD`,
@@ -100,9 +118,10 @@ macro_rules! impl_div_rem {
             // relative leading significant bits, cannot be negative because of above branches
             let rel_leading_sb = div_lz.wrapping_sub(duo_lz);
 
-            /*if (n_d == 128) && (rel_leading_sb < n) && (div_lz >= n) {
-                return unsafe { $n_d_by_n_division(duo, div) };
-            }*/
+            if $use_n_d_by_n_division && (rel_leading_sb < n) && (div_lz >= n) {
+                let (quo, rem) = unsafe { $n_d_by_n_division(duo, div as $uX) };
+                return (quo as $uD, rem as $uD);
+            }
 
             // `{2^n, 2^div_sb} <= duo < 2^n_d`
             // `1 <= div < {2^duo_sb, 2^(n_d - 1)}`
@@ -180,8 +199,8 @@ macro_rules! impl_div_rem {
                 // is at least `2^n_h`, and the previous branches make sure that the highest bit of
                 // `div_sig_n` is not the `2^(n - 1)` bit (which `duo_sig_n` has been shifted up to
                 // attain).
-                // 8. `2^n_h <= div_sig_n < 2^(n - 1)`
-                // 9. `2^(n - 1) <= duo_sig_n < 2^n`
+                // 8. `2^(n - 1) <= duo_sig_n < 2^n`
+                // 9. `2^n_h <= div_sig_n < 2^(n - 1)`
                 // 10. mul == duo_sig_n / div_sig_n. (definition)
                 //
                 // Using the bounds (8) and (9) with the `duo_sig_n / (div_sig_n + 1)` term. Note
@@ -193,27 +212,36 @@ macro_rules! impl_div_rem {
                 // 11. 1 <= mul <= 2^n_h - 1
                 //
                 // However, all this tells us is that `mul` can fit in a $uH.
-                // We want to show that `mul - 1 <= quo < mul + 1`, but it is not simple because we
-                // are using integer division rounded to 0. The hand waving proof I will use here is
-                // based on setting `n` to 16, and just putting extreme values through a calculator.
-                // Intuitively, what (7) and what we are trying to prove means is that the bits cut
-                // off by the shift can only affect `quo` enough to change it between two values.
+                // We want to show that `mul - 1 <= quo < mul + 1`. What this and (7) means is that
+                // the bits cut off by the shift at the beginning can only affect `quo` enough to
+                // change it between two values. First, I will show that
+                // `(duo_sig_n + 1) / div_sig_n` is equal to or less than `mul + 1`. We cannot
+                // simply use algebra here and say that `1 / div_sig_n` is 0, because we are working
+                // with truncated integer division. If the remainder is `div_sig_n - 1`, then the
+                // `+ 1` can be enough to cross the boundary and increment the quotient
+                // (e.x. 127/32 = 3, 128/32 = 4). Instead, we notice that in order for the remainder
+                // of `(duo_sig_n + x) / div_sig_n` to be wrapped around twice, `x` must be 1 for
+                // one of the wrap arounds and another `div_sig_n` added on to it to wrap around
+                // again. This cannot happen even if `div_sig_n` were 1, so
+                // 12. duo_sig_n / (div_sig_n + 1) <= quo < mul + 1
                 //
-                // Suppose `duo_sig_n` is 2^7 and `div_sig_n` is 2^4. If we then try (2^7 + 1)/2^4
-                // and 2^7/(2^4 + 1) we see that it is 8 or 7, which matches 2^7/2^4 and
-                // (2^7/2^4) - 1.
-                // Some other examples:
-                // (2^7 + 2^6 + 2^5 + 2^4)/(2^4) = 15
-                // (2^7 + 2^6 + 2^5 + 2^4 + 1)/(2^4) = 15
-                // (2^7 + 2^6 + 2^5 + 2^4)/(2^4 + 1) = 14
-                // (2^7 + 2^6 + 2^5 + 2^4)/(2^6 + 2^5 + 2^4) = 2
-                // (2^7 + 2^6 + 2^5 + 2^4 + 1)/(2^6 + 2^5 + 2^4) = 2
-                // (2^7 + 2^6 + 2^5 + 2^4)/(2^6 + 2^5 + 2^4 + 1) = 2
-                // (2^7)/(2^6 + 2^5 + 2^4) = 1
-                // (2^7 + 1)/(2^6 + 2^5 + 2^4) = 1
-                // (2^7)/(2^6 + 2^5 + 2^4 + 1) = 1
+                // Next, we want to show that `duo_sig_n / (div_sig_n + 1)` is more than or equal to
+                // `mul - 1`. Putting all the combinations of bounds from (8) and (9) into (10) and
+                // `duo_sig_n / (div_sig_n + 1)`,
+                // (2^n - 1) / 2^n_h = 2^n_h - 1
+                // (2^n - 1) / (2^n_h + 1) = 2^n_h - 1
                 //
-                // 12.  mul - 1 <= quo < mul + 1
+                // (2^n - 1) / (2^(n - 1) - 1) = 2
+                // (2^n - 1) / (2^(n - 1) - 1 + 1) = 1
+                //
+                // 2^(n - 1) / 2^n_h = 2^(n_h - 1)
+                // 2^(n - 1) / (2^n_h + 1) = 2^(n_h - 1) - 1
+                //
+                // 2^(n - 1) / (2^(n - 1) - 1) = 1
+                // 2^(n - 1) / 2^(n - 1) = 1
+                //
+                // 13. mul - 1 <= quo < mul + 1
+                //
                 // In a lot of division algorithms using smaller divisions to construct a larger
                 // division, we often encounter a situation where the approximate `mul` value
                 // calculated from a smaller division is a few increments away from the true `quo`
@@ -222,7 +250,7 @@ macro_rules! impl_div_rem {
                 // and see if `duo - (mul*div)` overflows. If it did overflow, then `quo` must be
                 // `mul - 1`, and because we already calculated `duo - (mul*div)` with wrapping
                 // operations, we can do simple operations without dividing again to find
-                // `duo - ((mul - 1)*div) == duo - (mul*div - div) == duo + div - mul*div`. If it
+                // `duo - ((mul - 1)*div) = duo - (mul*div - div) = duo + div - mul*div`. If it
                 // did not overflow, then `mul` must be the answer, because the remainder of
                 // `duo - ((mul - 1)*div)` is larger and farther away from overflow than
                 // `duo - (mul*div)`, which we already found is not overflowing.
@@ -239,20 +267,21 @@ macro_rules! impl_div_rem {
                 // duo cannot be more than `2^n_d - 1`, and overflow means a value more than that
                 let div_lo = div as $uX;
                 let div_hi = (div >> n) as $uX;
-                let (tmp_lo,carry) = carrying_mul(mul,div_lo);
-                let (tmp_hi,overflow) = carrying_mul_add(mul,div_hi,carry);
-                if (overflow != 0) || (((tmp_lo as $uD) | ((tmp_hi as $uD) << n)) > duo) {
-                    // Note that the overflow cannot be more than 1, otherwise the `div` subtraction
-                    // would not be able to bring the remainder value below 2^n_d - 1, which
-                    // contradicts many things.
+                let (tmp_lo, carry) = carrying_mul(mul,div_lo);
+                let (tmp_hi, overflow) = carrying_mul_add(mul,div_hi,carry);
+                let tmp = (tmp_lo as $uD) | ((tmp_hi as $uD) << n);
+                // Note that the overflow cannot be more than 1, otherwise the `div` subtraction
+                // would not be able to bring the remainder value below 2^n_d - 1, which
+                // contradicts many things. The `& 1` is here to encourage overflow flag use.
+                if ((overflow & 1) != 0) || (duo < tmp) {
                     return (
                         mul.wrapping_sub(1) as $uD,
-                        duo.wrapping_add(div.wrapping_sub((tmp_lo as $uD) | ((tmp_hi as $uD) << n)))
+                        duo.wrapping_add(div.wrapping_sub(tmp))
                     )
                 } else {
                     return (
                         mul as $uD,
-                        duo.wrapping_sub((tmp_lo as $uD) | ((tmp_hi as $uD) << n))
+                        duo.wrapping_sub(tmp)
                     )
                 }
             }
@@ -296,8 +325,8 @@ macro_rules! impl_div_rem {
             // actual algorithm, the quotient is progressively added to each step instead of at
             // the end).
             // In the actual algorithm below, instead of the final normal long division step, one of
-            // the three other algorithms ("quotient is 0 or 1", "mul or mul - 1", "n sized division"
-            //) is used.
+            // the three other algorithms ("quotient is 0 or 1", "mul or mul - 1", or
+            // "n sized division") is used.
 
             let mut duo = duo;
 
@@ -337,22 +366,25 @@ macro_rules! impl_div_rem {
                     let div_lo = div as $uX;
                     let div_hi = (div >> n) as $uX;
 
-                    let (tmp_lo,carry) = carrying_mul(mul,div_lo);
-                    let (tmp_hi,overflow) = carrying_mul_add(mul,div_hi,carry);
+                    let (tmp_lo, carry) = carrying_mul(mul,div_lo);
+                    // The special long division algorithm has already run once, so overflow beyond
+                    // 128 bits is not possible here
+                    let (tmp_hi, _) = carrying_mul_add(mul,div_hi,carry);
+                    let tmp = (tmp_lo as $uD) | ((tmp_hi as $uD) << n);
 
-                    if (overflow != 0) || (((tmp_lo as $uD) | ((tmp_hi as $uD) << n)) > duo) {
+                    if duo < tmp {
                         return (
                             // note that this time, the "mul or mul - 1" result is added to `quo`
                             // to get the final correct quotient
                             quo.wrapping_add(mul.wrapping_sub(1) as $uD),
                             duo.wrapping_add(
-                                div.wrapping_sub((tmp_lo as $uD) | ((tmp_hi as $uD) << n))
+                                div.wrapping_sub(tmp)
                             )
                         )
                     } else {
                         return (
                             quo.wrapping_add(mul as $uD),
-                            duo.wrapping_sub((tmp_lo as $uD) | ((tmp_hi as $uD) << n))
+                            duo.wrapping_sub(tmp)
                         )
                     }
                 }
@@ -419,8 +451,8 @@ macro_rules! impl_div_rem {
         fn $test_name() {
             type T = $uD;
             let n = $n_h * 4;
-            //checks all possible single continuous strings of ones (except when all bits are zero)
-            //uses about 68 million iterations for T = u128
+            // checks all possible single continuous strings of ones (except when all bits are zero)
+            // uses about 68 million iterations for T = u128
             let mut lhs0: T = 1;
             for i0 in 1..=n {
                 let mut lhs1 = lhs0;
@@ -429,14 +461,11 @@ macro_rules! impl_div_rem {
                     for i2 in 1..=n {
                         let mut rhs1 = rhs0;
                         for i3 in 0..i2 {
-                            assert_eq!((lhs1 / rhs1, lhs1 % rhs1),$unsigned_name(lhs1,rhs1));
-                            //avoid the $iD::MIN/-1 overflow
-                            if !((lhs1 as $iD == ::core::$iD::MIN) && (rhs1 as $iD == -1)) {
-                                assert_eq!(
-                                    ((lhs1 as $iD) / (rhs1 as $iD), (lhs1 as $iD) % (rhs1 as $iD)),
-                                    $signed_name(lhs1 as $iD,rhs1 as $iD)
-                                );
-                            }
+                            assert_eq!((lhs1.wrapping_div(rhs1), lhs1.wrapping_rem(rhs1)),$unsigned_name(lhs1,rhs1));
+                            assert_eq!(
+                                ((lhs1 as $iD).wrapping_div(rhs1 as $iD), (lhs1 as $iD).wrapping_rem(rhs1 as $iD)),
+                                $signed_name(lhs1 as $iD,rhs1 as $iD)
+                            );
                             rhs1 ^= 1 << i3;
                         }
                         rhs0 <<= 1;
@@ -447,7 +476,7 @@ macro_rules! impl_div_rem {
                 lhs0 <<= 1;
                 lhs0 |= 1;
             }
-            //binary fuzzer
+            // binary fuzzer
             use rand::random;
             let mut lhs: T = 0;
             let mut rhs: T = 0;
@@ -472,22 +501,22 @@ macro_rules! impl_div_rem {
                     (true,true,true) => rhs ^= mask,
                 }
                 if rhs != 0 {
-                    assert_eq!((lhs / rhs, lhs % rhs),$unsigned_name(lhs,rhs));
-                    if !((lhs as $iD == ::core::$iD::MIN) && (rhs as $iD == -1)) {
-                        assert_eq!(
-                            ((lhs as $iD) / (rhs as $iD), (lhs as $iD) % (rhs as $iD)),
-                            $signed_name(lhs as $iD,rhs as $iD)
-                        );
-                    }
+                    assert_eq!((lhs.wrapping_div(rhs), lhs.wrapping_rem(rhs)),$unsigned_name(lhs,rhs));
                 }
             }
-            assert_eq!($signed_name(::core::$iD::MIN,-1),(::core::$iD::MIN,0));
         }
     }
 }
 
-impl_div_rem!(u32_div_rem, i32_div_rem, u32_i32_div_rem_test, 8u32, u8, u16, u32, i32, 0b11111u32, inline; inline, doc = "Note that unlike some of Rust's division functions, `i32_div_rem(i32::MIN,-1)` will not panic but instead overflow and produce the correct truncated two's complement `(i32::MIN,0)`.";{});
-impl_div_rem!(u64_div_rem, i64_div_rem, u64_i64_div_rem_test, 16u32, u16, u32, u64, i64, 0b111111u32, inline; inline, doc = "Note that unlike some of Rust's division functions, `i64_div_rem(i64::MIN,-1)` will not panic but instead overflow and produce the correct truncated two's complement `(i64::MIN,0)`.";{});
-impl_div_rem!(u128_div_rem, i128_div_rem, u128_i128_div_rem_test, 32u32, u32, u64, u128, i128, 0b1111111u32, inline(never); inline, doc = "Note that unlike some of Rust's division functions, `i128_div_rem(i128::MIN,-1)` will not panic but instead overflow and produce the correct truncated two's complement `(i128::MIN,0)`.";
+impl_div_rem!(u32_div_rem, i32_div_rem, u32_i32_div_rem_test, 8u32, u8, u16, u32, i32, 0b11111u32, inline; inline;
+    false,
+    dummy_32
+);
+impl_div_rem!(u64_div_rem, i64_div_rem, u64_i64_div_rem_test, 16u32, u16, u32, u64, i64, 0b111111u32, inline; inline;
+    false,
+    dummy_64
+);
+impl_div_rem!(u128_div_rem, i128_div_rem, u128_i128_div_rem_test, 32u32, u32, u64, u128, i128, 0b1111111u32, inline(never); inline;
+    true,
     divrem_128_by_64
 );
