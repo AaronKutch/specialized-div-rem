@@ -23,8 +23,12 @@ unsafe fn divrem_128_by_64(duo: u128, div: u64) -> (u64, u64) {
     return (quo, rem);
 }
 
-unsafe fn dummy_64(duo: u64, div: u32) -> (u32, u32) {(duo as u32, div)}
-unsafe fn dummy_32(duo: u32, div: u16) -> (u16, u16) {(duo as u16, div)}
+unsafe fn dummy_64(duo: u64, div: u32) -> (u32, u32) {
+    (duo as u32, div)
+}
+unsafe fn dummy_32(duo: u32, div: u16) -> (u16, u16) {
+    (duo as u16, div)
+}
 
 /// Generates a function that returns the quotient and remainder of unsigned integer division of
 /// `duo` by `div`. The function uses 3 different algorithms (and several conditionals for simple
@@ -461,9 +465,15 @@ macro_rules! impl_div_rem {
                     for i2 in 1..=n {
                         let mut rhs1 = rhs0;
                         for i3 in 0..i2 {
-                            assert_eq!((lhs1.wrapping_div(rhs1), lhs1.wrapping_rem(rhs1)),$unsigned_name(lhs1,rhs1));
                             assert_eq!(
-                                ((lhs1 as $iD).wrapping_div(rhs1 as $iD), (lhs1 as $iD).wrapping_rem(rhs1 as $iD)),
+                                (lhs1.wrapping_div(rhs1),
+                                lhs1.wrapping_rem(rhs1)),$unsigned_name(lhs1,rhs1)
+                            );
+                            assert_eq!(
+                                (
+                                    (lhs1 as $iD).wrapping_div(rhs1 as $iD),
+                                    (lhs1 as $iD).wrapping_rem(rhs1 as $iD)
+                                ),
                                 $signed_name(lhs1 as $iD,rhs1 as $iD)
                             );
                             rhs1 ^= 1 << i3;
@@ -501,22 +511,16 @@ macro_rules! impl_div_rem {
                     (true,true,true) => rhs ^= mask,
                 }
                 if rhs != 0 {
-                    assert_eq!((lhs.wrapping_div(rhs), lhs.wrapping_rem(rhs)),$unsigned_name(lhs,rhs));
+                    assert_eq!(
+                        (lhs.wrapping_div(rhs), lhs.wrapping_rem(rhs)),
+                        $unsigned_name(lhs,rhs)
+                    );
                 }
             }
         }
     }
 }
 
-impl_div_rem!(u32_div_rem, i32_div_rem, u32_i32_div_rem_test, 8u32, u8, u16, u32, i32, 0b11111u32, inline; inline;
-    false,
-    dummy_32
-);
-impl_div_rem!(u64_div_rem, i64_div_rem, u64_i64_div_rem_test, 16u32, u16, u32, u64, i64, 0b111111u32, inline; inline;
-    false,
-    dummy_64
-);
-impl_div_rem!(u128_div_rem, i128_div_rem, u128_i128_div_rem_test, 32u32, u32, u64, u128, i128, 0b1111111u32, inline(never); inline;
-    true,
-    divrem_128_by_64
-);
+impl_div_rem!(u32_div_rem, i32_div_rem, u32_i32_div_rem_test, 8u32, u8, u16, u32, i32, 0b11111u32, inline; inline; false, dummy_32);
+impl_div_rem!(u64_div_rem, i64_div_rem, u64_i64_div_rem_test, 16u32, u16, u32, u64, i64, 0b111111u32, inline; inline; false, dummy_64);
+impl_div_rem!(u128_div_rem, i128_div_rem, u128_i128_div_rem_test, 32u32, u32, u64, u128, i128, 0b1111111u32, inline(never); inline; true, divrem_128_by_64);
