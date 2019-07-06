@@ -1,10 +1,10 @@
-#[cfg(not(target_arch = "x86_64"))]
+/*#[cfg(not(target_arch = "x86_64"))]
 #[inline]
 unsafe fn divrem_128_by_64(duo: u128, div: u64) -> (u64, u64) {
     let quo = duo.wrapping_div(div as u128);
     let rem = duo.wrapping_rem(div as u128);
     return (quo as u64, rem as u64);
-}
+}*/
 
 /// This function is unsafe, because if the quotient of `duo` and `div` does not fit in a `u64`,
 /// a floating point exception is thrown.
@@ -23,16 +23,10 @@ unsafe fn divrem_128_by_64(duo: u128, div: u64) -> (u64, u64) {
     return (quo, rem);
 }
 
-unsafe fn dummy_64(duo: u64, div: u32) -> (u32, u32) {
-    (duo as u32, div)
-}
-unsafe fn dummy_32(duo: u32, div: u16) -> (u16, u16) {
-    (duo as u16, div)
-}
-
 /// Generates a function that returns the quotient and remainder of unsigned integer division of
-/// `duo` by `div`. The function uses 3 different algorithms (and several conditionals for simple
-/// cases) that handle almost all numerical magnitudes efficiently.
+/// `duo` by `div`. This uses $uX by $uX sized divisions. The function uses 3 different algorithms
+/// (and several conditionals for simple cases) that handle almost all numerical magnitudes
+/// efficiently.
 macro_rules! impl_div_rem {
     (
         $unsigned_name:ident, //name of the unsigned function
@@ -45,13 +39,12 @@ macro_rules! impl_div_rem {
         $iD:ident, //signed version of $uD
         $bit_selector_max:expr, //the max value of the smallest bit string needed to index the bits of an $uD
         $($unsigned_attr:meta),*; //attributes for the unsigned function
-        $($signed_attr:meta),*; //attributes for the signed function
-        $use_n_d_by_n_division:expr,
-        $n_d_by_n_division:ident
+        $($signed_attr:meta),*//; //attributes for the signed function
+        //$use_n_d_by_n_division:expr,
+        //$n_d_by_n_division:ident
     ) => {
         //wrapping_{} was used everywhere for better performance when compiling with
         //`debug-assertions = true`
-        //TODO if and when `carrying_mul` (rust-lang rfc #2417) is stabilized, this can be fixed
 
         /// Computes the quotient and remainder of `duo` divided by `div` and returns them as a
         /// tuple.
@@ -64,6 +57,7 @@ macro_rules! impl_div_rem {
         )*
         pub fn $unsigned_name(duo: $uD, div: $uD) -> ($uD,$uD) {
 
+            // TODO if and when `carrying_mul` (rust-lang rfc #2417) is stabilized, this can be fixed
             // LLVM correctly optimizes this to use a widening multiply to 128 bits
             #[inline(always)]
             pub fn carrying_mul(lhs: $uX, rhs: $uX) -> ($uX, $uX) {
@@ -76,17 +70,9 @@ macro_rules! impl_div_rem {
                 (tmp as $uX, (tmp >> ($n_h * 2)) as $uX)
             }
 
-            // division by zero branch
-            if div == 0 {
-                panic!("division by zero")
-            }
-
-            // the possible ranges of `duo` and `div` at this point:
-            // `0 <= duo < 2^n_d`
-            // `1 <= div < 2^n_d`
-
             // the number of bits in a $uX
             let n = $n_h * 2;
+            let n_d = n * 2;
 
             // Note that throughout this function, `lo` and `hi` refer to the high and low `n` bits
             // of a `$uD`, `0` to `3` refer to the 4 `n_h` bit parts of a `$uD`,
@@ -94,6 +80,15 @@ macro_rules! impl_div_rem {
 
             let div_lz = div.leading_zeros();
             let mut duo_lz = duo.leading_zeros();
+
+            // division by zero branch
+            if div_lz == n_d {
+                panic!("division by zero")
+            }
+
+            // the possible ranges of `duo` and `div` at this point:
+            // `0 <= duo < 2^n_d`
+            // `1 <= div < 2^n_d`
 
             // quotient is 0 or 1 branch
             if div_lz <= duo_lz {
@@ -122,10 +117,10 @@ macro_rules! impl_div_rem {
             // relative leading significant bits, cannot be negative because of above branches
             let rel_leading_sb = div_lz.wrapping_sub(duo_lz);
 
-            if $use_n_d_by_n_division && (rel_leading_sb < n) && (div_lz >= n) {
+            /*if $use_n_d_by_n_division && (rel_leading_sb < n) && (div_lz >= n) {
                 let (quo, rem) = unsafe { $n_d_by_n_division(duo, div as $uX) };
                 return (quo as $uD, rem as $uD);
-            }
+            }*/
 
             // `{2^n, 2^div_sb} <= duo < 2^n_d`
             // `1 <= div < {2^duo_sb, 2^(n_d - 1)}`
@@ -521,6 +516,282 @@ macro_rules! impl_div_rem {
     }
 }
 
-impl_div_rem!(u32_div_rem, i32_div_rem, u32_i32_div_rem_test, 8u32, u8, u16, u32, i32, 0b11111u32, inline; inline; false, dummy_32);
-impl_div_rem!(u64_div_rem, i64_div_rem, u64_i64_div_rem_test, 16u32, u16, u32, u64, i64, 0b111111u32, inline; inline; false, dummy_64);
-impl_div_rem!(u128_div_rem, i128_div_rem, u128_i128_div_rem_test, 32u32, u32, u64, u128, i128, 0b1111111u32, inline(never); inline; true, divrem_128_by_64);
+/// Generates a function that returns the quotient and remainder of unsigned integer division of
+/// `duo` by `div`. This is similar to `impl_div_rem`, except that this uses $uD by $uX sized
+/// divisions internally.
+macro_rules! impl_div_rem_2 {
+    (
+        $unsigned_name:ident, //name of the unsigned function
+        $signed_name:ident, //name of the signed function
+        $test_name:ident, //name of the test function
+        $n_h:expr, //the number of bits in $iH or $uH
+        $uH:ident, //unsigned integer with half the bit width of $uX
+        $uX:ident, //the largest division instruction that this function calls operates on this
+        $uD:ident, //unsigned integer with double the bit width of $uX
+        $iD:ident, //signed version of $uD
+        $bit_selector_max:expr, //the max value of the smallest bit string needed to index the bits of an $uD
+        $($unsigned_attr:meta),*; //attributes for the unsigned function
+        $($signed_attr:meta),*; //attributes for the signed function
+        $n_d_by_n_division:ident
+    ) => {
+
+        /// Computes the quotient and remainder of `duo` divided by `div` and returns them as a
+        /// tuple.
+        ///
+        /// # Panics
+        ///
+        /// When attempting to divide by zero, this function will panic.
+        $(
+            #[$unsigned_attr]
+        )*
+        pub fn $unsigned_name(duo: $uD, div: $uD) -> ($uD,$uD) {
+            // TODO if and when `carrying_mul` (rust-lang rfc #2417) is stabilized, this can be fixed
+            #[inline(always)]
+            pub fn carrying_mul(lhs: $uX, rhs: $uX) -> ($uX, $uX) {
+                let tmp = (lhs as $uD).wrapping_mul(rhs as $uD);
+                (tmp as $uX, (tmp >> ($n_h * 2)) as $uX)
+            }
+            #[inline(always)]
+            pub fn carrying_mul_add(lhs: $uX, mul: $uX, add: $uX) -> ($uX, $uX) {
+                let tmp = (lhs as $uD).wrapping_mul(mul as $uD).wrapping_add(add as $uD);
+                (tmp as $uX, (tmp >> ($n_h * 2)) as $uX)
+            }
+
+            // The documentation has been stripped from here, see `impl_div_rem` for more.
+
+            let n = $n_h * 2;
+            let n_d = n * 2;
+
+            let mut duo = duo;
+
+            let div_lz = div.leading_zeros();
+            let duo_lz = duo.leading_zeros();
+
+            // division by 0 branch
+            if div_lz == n_d {
+                panic!("division by zero")
+            }
+
+            // quotient is 0 or 1 branch
+            if div_lz <= duo_lz {
+                if duo >= div {
+                    return (1,duo.wrapping_sub(div))
+                } else {
+                    return (0,duo)
+                }
+            }
+
+            // smaller division branch
+            if duo_lz >= n {
+                return (
+                    (duo as $uX).wrapping_div(div as $uX) as $uD,
+                    (duo as $uX).wrapping_rem(div as $uX) as $uD
+                )
+            }
+
+            let rel_leading_sb = div_lz.wrapping_sub(duo_lz);
+
+            // Unfortunately, the quotient from the `$n_d_by_n_division` must fit in a $uX, or else
+            // some kind of CPU error is thrown.
+            if (rel_leading_sb < n) && (div_lz >= n) {
+                let (quo, rem) = unsafe { $n_d_by_n_division(duo, div as $uX) };
+                return (quo as $uD, rem as $uD);
+            }
+
+            // regular long division branch
+            if div_lz >= (n + $n_h) {
+                let div_lo = (div as $uH) as $uX;
+
+                let duo_hi = (duo >> n) as $uX;
+                let quo_hi = duo_hi.wrapping_div(div_lo);
+                let rem_2 = duo_hi.wrapping_rem(div_lo) as $uH;
+
+                let duo_mid =
+                    (((duo >> $n_h) as $uH) as $uX)
+                    | ((rem_2 as $uX) << $n_h);
+                let quo_1 = duo_mid.wrapping_div(div_lo) as $uH;
+                let rem_1 = duo_mid.wrapping_rem(div_lo) as $uH;
+
+                let duo_lo =
+                    ((duo as $uH) as $uX)
+                    | ((rem_1 as $uX) << $n_h);
+                let quo_0 = duo_lo.wrapping_div(div_lo) as $uH;
+                return (
+                    (quo_0 as $uD) | ((quo_1 as $uD) << $n_h) | ((quo_hi as $uD) << n),
+                    (duo_lo.wrapping_rem(div_lo) as $uH) as $uD
+                )
+            }
+
+            // `mul` or `mul - 1` branch
+            if rel_leading_sb < n {
+                let shift = n.wrapping_sub(div_lz);
+                let duo_sig_n_d = duo >> shift;
+                let div_sig_n = (div >> shift) as $uX;
+                let mul = unsafe { $n_d_by_n_division(duo_sig_n_d, div_sig_n).0 };
+
+                let div_lo = div as $uX;
+                let div_hi = (div >> n) as $uX;
+                let (tmp_lo, carry) = carrying_mul(mul,div_lo);
+                let (tmp_hi, overflow) = carrying_mul_add(mul,div_hi,carry);
+                let tmp = (tmp_lo as $uD) | ((tmp_hi as $uD) << n);
+                if ((overflow & 1) != 0) || (duo < tmp) {
+                    return (
+                        mul.wrapping_sub(1) as $uD,
+                        duo.wrapping_add(div.wrapping_sub(tmp))
+                    )
+                } else {
+                    return (
+                        mul as $uD,
+                        duo.wrapping_sub(tmp)
+                    )
+                }
+            }
+
+            // `div` is guaranteed to fit into a $uX by this point
+
+            let mut quo: $uD = 0;
+
+            // The specialized long division step can clear `n - 1` bits from `duo`, leaving only
+            // one potential bit keeping us from doing a smaller division. We would need to put
+            // a single binary long division step somewhere, and it was decided to put a fixed
+            // binary division here, because then `rel_leading_sb < n` is guaranteed (with `div_lo`
+            // shifted so `div_lo_lz == 0`), and some conditionals could be eliminated.
+            if duo_lz == 0 {
+                let tmp = div << div_lz;
+                if tmp > duo {
+                    quo = quo.wrapping_add(1 << (div_lz - 1));
+                    duo = duo.wrapping_sub(tmp >> 1);
+                } else {
+                    quo = quo.wrapping_add(1 << div_lz);
+                    duo = duo.wrapping_sub(tmp);
+                }
+            }
+
+            let div_lo = div as $uX;
+            let div_lo_lz = div_lo.leading_zeros();
+
+            // no shifting of `duo` or increment of `div` needed, just keep `rel_leading_sb` within
+            // `n`
+            let div_sig_n = div_lo << div_lo_lz;
+
+            // special division step
+            let mul = unsafe { $n_d_by_n_division(duo, div_sig_n).0 as $uD };
+            quo = quo.wrapping_add(mul << div_lo_lz);
+            duo = duo.wrapping_sub((div_lo as $uD).wrapping_mul(mul) << div_lo_lz);
+
+            // duo is guaranteed to fit in a $uX at this point
+            let duo_lo = duo as $uX;
+
+            // simple division and addition
+            return (
+                quo.wrapping_add(duo_lo.wrapping_div(div_lo) as $uD),
+                duo_lo.wrapping_rem(div_lo) as $uD
+            )
+        }
+
+        /// Computes the quotient and remainder of `duo` divided by `div` and returns them as a
+        /// tuple.
+        ///
+        /// # Panics
+        ///
+        /// When attempting to divide by zero, this function will panic.
+        $(
+            #[$signed_attr]
+        )*
+        pub fn $signed_name(duo: $iD, div: $iD) -> ($iD,$iD) {
+            match (duo < 0, div < 0) {
+                (false,false) => {
+                    let t = $unsigned_name(duo as $uD,div as $uD);
+                    (t.0 as $iD,t.1 as $iD)
+                },
+                (true,false) => {
+                    let t = $unsigned_name(duo.wrapping_neg() as $uD,div as $uD);
+                    ((t.0 as $iD).wrapping_neg(),(t.1 as $iD).wrapping_neg())
+                },
+                (false,true) => {
+                    let t = $unsigned_name(duo as $uD,div.wrapping_neg() as $uD);
+                    ((t.0 as $iD).wrapping_neg(),t.1 as $iD)
+                },
+                (true,true) => {
+                    let t = $unsigned_name(duo.wrapping_neg() as $uD,div.wrapping_neg() as $uD);
+                    (t.0 as $iD,(t.1 as $iD).wrapping_neg())
+                },
+            }
+        }
+
+        #[test]
+        fn $test_name() {
+            type T = $uD;
+            let n = $n_h * 4;
+            // checks all possible single continuous strings of ones (except when all bits are zero)
+            // uses about 68 million iterations for T = u128
+            let mut lhs0: T = 1;
+            for i0 in 1..=n {
+                let mut lhs1 = lhs0;
+                for i1 in 0..i0 {
+                    let mut rhs0: T = 1;
+                    for i2 in 1..=n {
+                        let mut rhs1 = rhs0;
+                        for i3 in 0..i2 {
+                            assert_eq!(
+                                (lhs1.wrapping_div(rhs1),
+                                lhs1.wrapping_rem(rhs1)),$unsigned_name(lhs1,rhs1)
+                            );
+                            assert_eq!(
+                                (
+                                    (lhs1 as $iD).wrapping_div(rhs1 as $iD),
+                                    (lhs1 as $iD).wrapping_rem(rhs1 as $iD)
+                                ),
+                                $signed_name(lhs1 as $iD,rhs1 as $iD)
+                            );
+                            rhs1 ^= 1 << i3;
+                        }
+                        rhs0 <<= 1;
+                        rhs0 |= 1;
+                    }
+                    lhs1 ^= 1 << i1;
+                }
+                lhs0 <<= 1;
+                lhs0 |= 1;
+            }
+            // binary fuzzer
+            use rand::random;
+            let mut lhs: T = 0;
+            let mut rhs: T = 0;
+            let mut ones: T;
+            for _ in 0..10_000_000 {
+                let r0: u32 = $bit_selector_max & random::<u32>();
+                ones = 0;
+                for _ in 0..r0 {
+                    ones <<= 1;
+                    ones |= 1;
+                }
+                let r1: u32 = $bit_selector_max & random::<u32>();
+                let mask = ones.rotate_left(r1);
+                match (random(),random(),random()) {
+                    (false,false,false) => lhs |= mask,
+                    (false,false,true) => lhs &= mask,
+                    (false,true,false) => lhs ^= mask,
+                    (false,true,true) => lhs ^= mask,
+                    (true,false,false) => rhs |= mask,
+                    (true,false,true) => rhs &= mask,
+                    (true,true,false) => rhs ^= mask,
+                    (true,true,true) => rhs ^= mask,
+                }
+                if rhs != 0 {
+                    assert_eq!(
+                        (lhs.wrapping_div(rhs), lhs.wrapping_rem(rhs)),
+                        $unsigned_name(lhs,rhs)
+                    );
+                }
+            }
+        }
+    }
+}
+
+impl_div_rem!(u32_div_rem, i32_div_rem, u32_i32_div_rem_test, 8u32, u8, u16, u32, i32, 0b11111u32, inline; inline);
+impl_div_rem!(u64_div_rem, i64_div_rem, u64_i64_div_rem_test, 16u32, u16, u32, u64, i64, 0b111111u32, inline; inline);
+//#[cfg(not(target_arch = "x86_64"))]
+//impl_div_rem!(u128_div_rem, i128_div_rem, u128_i128_div_rem_test, 32u32, u32, u64, u128, i128, 0b1111111u32, inline; inline; true, divrem_128_by_64);
+#[cfg(target_arch = "x86_64")]
+impl_div_rem_2!(u128_div_rem, i128_div_rem, u128_i128_div_rem_test, 32u32, u32, u64, u128, i128, 0b1111111u32, inline; inline; divrem_128_by_64);
