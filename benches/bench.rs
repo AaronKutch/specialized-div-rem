@@ -203,9 +203,21 @@ std_and_new_bencher!(
     0u32,
     1u32,
     32,
-    32 - 8,
-    u32_div_rem_all_mid_std,
-    u32_div_rem_all_mid_new
+    24,
+    u32_div_rem_32_24_std,
+    u32_div_rem_32_24_new
+);
+std_and_new_bencher!(
+    u32_div_rem,
+    FnKind::DivRem,
+    u32,
+    32,
+    0u32,
+    1u32,
+    30,
+    16,
+    u32_div_rem_30_16_std,
+    u32_div_rem_30_16_new
 );
 std_and_new_bencher!(
     u64_div_rem,
@@ -215,33 +227,45 @@ std_and_new_bencher!(
     0u64,
     1u64,
     64,
-    64 - 16,
-    u64_div_rem_all_mid_std,
-    u64_div_rem_all_mid_new
+    48,
+    u64_div_rem_64_48_std,
+    u64_div_rem_64_48_new
 );
 std_and_new_bencher!(
-    u128_div_rem,
+    u64_div_rem,
     FnKind::DivRem,
-    u128,
-    128,
-    0u128,
-    1u128,
-    128,
-    128 - 32,
-    u128_div_rem_all_mid_std,
-    u128_div_rem_all_mid_new
-);
-std_and_new_bencher!(
-    u128_div_rem,
-    FnKind::DivRem,
-    u128,
-    128,
-    0u128,
-    1u128,
-    110,
+    u64,
     64,
-    u128_div_rem_110_64_std,
-    u128_div_rem_110_64_new
+    0u64,
+    1u64,
+    62,
+    32,
+    u64_div_rem_62_32_std,
+    u64_div_rem_62_32_new
+);
+std_and_new_bencher!(
+    u128_div_rem,
+    FnKind::DivRem,
+    u128,
+    128,
+    0u128,
+    1u128,
+    128,
+    96,
+    u128_div_rem_128_96_std,
+    u128_div_rem_128_96_new
+);
+std_and_new_bencher!(
+    u128_div_rem,
+    FnKind::DivRem,
+    u128,
+    128,
+    0u128,
+    1u128,
+    126,
+    64,
+    u128_div_rem_126_64_std,
+    u128_div_rem_126_64_new
 );
 std_and_new_bencher!(
     i128_div_rem,
@@ -251,34 +275,9 @@ std_and_new_bencher!(
     0i128,
     1i128,
     128,
-    128 - 32,
-    i128_div_rem_all_mid_std,
-    i128_div_rem_all_mid_new
-);
-
-std_and_new_bencher!(
-    u32_div_rem,
-    FnKind::Div,
-    u32,
-    32,
-    0u32,
-    1u32,
-    32,
-    32 - 8,
-    u32_div_all_mid_std,
-    u32_div_all_mid_new
-);
-std_and_new_bencher!(
-    u64_div_rem,
-    FnKind::Div,
-    u64,
-    64,
-    0u64,
-    1u64,
-    64,
-    64 - 16,
-    u64_div_all_mid_std,
-    u64_div_all_mid_new
+    96,
+    i128_div_rem_128_96_std,
+    i128_div_rem_128_96_new
 );
 std_and_new_bencher!(
     u128_div_rem,
@@ -288,11 +287,10 @@ std_and_new_bencher!(
     0u128,
     1u128,
     128,
-    128 - 32,
-    u128_div_all_mid_std,
-    u128_div_all_mid_new
+    96,
+    u128_div_128_96_std,
+    u128_div_128_96_new
 );
-
 std_and_new_bencher!(
     u128_div_rem,
     FnKind::Rem,
@@ -301,11 +299,10 @@ std_and_new_bencher!(
     0u128,
     1u128,
     128,
-    128 - 32,
-    u128_rem_all_mid_std,
-    u128_rem_all_mid_new
+    96,
+    u128_rem_128_96_std,
+    u128_rem_128_96_new
 );
-
 std_and_new_bencher!(
     u128_div_rem,
     FnKind::DivRem,
@@ -315,8 +312,8 @@ std_and_new_bencher!(
     1u128,
     128,
     128,
-    u128_div_rem_all_all_std,
-    u128_div_rem_all_all_new
+    u128_div_rem_128_128_std,
+    u128_div_rem_128_128_new
 );
 std_and_new_bencher!(
     u128_div_rem,
@@ -327,20 +324,8 @@ std_and_new_bencher!(
     1u128,
     128,
     32,
-    u128_div_rem_all_0_std,
-    u128_div_rem_all_0_new
-);
-std_and_new_bencher!(
-    u128_div_rem,
-    FnKind::Div,
-    u128,
-    128,
-    0u128,
-    1u128,
-    128,
-    128,
-    u128_div_all_all_std,
-    u128_div_all_all_new
+    u128_div_rem_128_32_std,
+    u128_div_rem_128_32_new
 );
 std_and_new_bencher!(
     u128_div_rem,
@@ -351,18 +336,6 @@ std_and_new_bencher!(
     1u128,
     128,
     64,
-    u128_div_rem_all_lo_std,
-    u128_div_rem_all_lo_new
-);
-std_and_new_bencher!(
-    u128_div_rem,
-    FnKind::Div,
-    u128,
-    128,
-    0u128,
-    1u128,
-    128,
-    32,
-    u128_div_all_0_std,
-    u128_div_all_0_new
+    u128_div_rem_128_64_std,
+    u128_div_rem_128_64_new
 );

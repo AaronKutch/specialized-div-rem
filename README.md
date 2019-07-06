@@ -1,7 +1,7 @@
 # Specialized Division and Remainder Algorithms
 
 Currently, this crate provides an alternative form of long division that is faster than the functions provided by Rust primitives on some CPUs.
-Note that setting the the flag for compilation to a native cpu and using LTO can make a significant performance improvement for these functions.
+Note that setting the the flag for compilation to a native cpu can make a significant performance improvement for these functions.
 
 Most division algorithms end up doing most of the work to get both the quotient and remainder, which is why these functions return both (and the compiler can inline and optimize away unused results and calculations).
 
@@ -26,23 +26,21 @@ The names of the benchmarks specify 4 things:
 
     - the type of integer being operated on,
     - whether the quotient (`_div`) or remainder (`_rem`) or both (`div_rem`) are calculated,
-    - the size of the numbers being entered,
+    - the size of the numbers being entered (specifically, how many lower bits the random integer
+      is being kept),
     - whether Rust's current algorithm or the algorithm in this crate is being used
 
-Benchmarks vary based on the numerical size of the numbers being entered, and for each division function 3 different sizes are entered:
+For example, the `u128_div_rem_126_64_new` benchmark tests how long it takes to find 32 quotients
+and remainders of a u128 random integer with the top 2 bits zeroed divided by a u128 random integer
+with the top 64 bits zeroed.
 
-    - `_all_all` means that all of the bits of `duo` and `div` are random
-    - `_all_mid` means that all the bits of `duo` are random and the lower 3/4 bits of `div` are random (the higher 1/4 of the bits are zero),
-    - `_all_0` means that all the bits of `duo` are random and the lower 1/4 bits of `div` are random
+The `constant_u128_div_rem` benchmark is a hardcoded benchmark working on a constant array of integers.
+The `_baseline` benchmarks are just there to make sure that the process of adding the 32 answers together (to prevent the compiler from optimizing away code) does not take a lot of time.
 
 The `_new` benches are using the algorithm in this library and the `_std` benches are using the algorithms Rust is using for `/` and `%`.
 
-Additionally, when the benchmarks are run, some of the time per iteration is taken up by operations other than the division operation.
-The `_baseline` benchmarks approximate this time.
-
 On an AMD FX-9800P RADEON R7, the benchmarks look like this.
 Note that all of the 128 bit benches show improvement of the long division over the one Rust is using.
-
 ```
 test constant_u128_div_rem_long ... bench:       1,982 ns/iter (+/- 547)
 test constant_u128_div_rem_std  ... bench:       4,168 ns/iter (+/- 869)
@@ -70,25 +68,24 @@ test u128_rem_all_mid_std       ... bench:       4,928 ns/iter (+/- 933)
 
 On an Intel i3-3240,
 ```
-test constant_u128_div_rem_new ... bench:       1,379 ns/iter (+/- 706)
-test constant_u128_div_rem_std ... bench:       3,126 ns/iter (+/- 1,127)
-test i128_div_rem_all_mid_new  ... bench:       1,021 ns/iter (+/- 29)
-test i128_div_rem_all_mid_std  ... bench:       3,848 ns/iter (+/- 234)
-test u128_baseline             ... bench:          67 ns/iter (+/- 23)
-test u128_div_all_0_new        ... bench:       1,103 ns/iter (+/- 8)
-test u128_div_all_0_std        ... bench:       9,360 ns/iter (+/- 313)
-test u128_div_all_all_new      ... bench:         457 ns/iter (+/- 560)
-test u128_div_all_all_std      ... bench:         735 ns/iter (+/- 829)
-test u128_div_all_mid_new      ... bench:         992 ns/iter (+/- 921)
-test u128_div_all_mid_std      ... bench:       3,513 ns/iter (+/- 1,885)
-test u128_div_rem_all_0_new    ... bench:       1,146 ns/iter (+/- 573)
-test u128_div_rem_all_0_std    ... bench:       9,438 ns/iter (+/- 276)
-test u128_div_rem_all_all_new  ... bench:         513 ns/iter (+/- 41)
-test u128_div_rem_all_all_std  ... bench:         828 ns/iter (+/- 611)
-test u128_div_rem_all_lo_new   ... bench:       1,704 ns/iter (+/- 85)
-test u128_div_rem_all_lo_std   ... bench:       6,648 ns/iter (+/- 207)
-test u128_div_rem_all_mid_new  ... bench:       1,077 ns/iter (+/- 67)
-test u128_div_rem_all_mid_std  ... bench:       3,732 ns/iter (+/- 2,858)
-test u128_rem_all_mid_new      ... bench:       1,136 ns/iter (+/- 70)
-test u128_rem_all_mid_std      ... bench:       3,629 ns/iter (+/- 895)
+test constant_u128_div_rem_new ... bench:       1,391 ns/iter (+/- 1,486)
+test constant_u128_div_rem_std ... bench:       3,128 ns/iter (+/- 439)
+test i128_div_rem_128_96_new   ... bench:         944 ns/iter (+/- 306)
+test i128_div_rem_128_96_std   ... bench:       3,929 ns/iter (+/- 1,045)
+test u128_baseline             ... bench:          67 ns/iter (+/- 0)
+test u128_div_128_96_new       ... bench:       1,087 ns/iter (+/- 169)
+test u128_div_128_96_std       ... bench:       3,611 ns/iter (+/- 336)
+test u128_div_rem_126_64_new   ... bench:       1,245 ns/iter (+/- 583)
+test u128_div_rem_126_64_std   ... bench:       6,492 ns/iter (+/- 138)
+test u128_div_rem_128_128_new  ... bench:         446 ns/iter (+/- 106)
+test u128_div_rem_128_128_std  ... bench:         887 ns/iter (+/- 144)
+test u128_div_rem_128_32_new   ... bench:       1,157 ns/iter (+/- 560)
+test u128_div_rem_128_32_std   ... bench:       9,582 ns/iter (+/- 889)
+test u128_div_rem_128_64_new   ... bench:       1,504 ns/iter (+/- 1,056)
+test u128_div_rem_128_64_std   ... bench:       6,587 ns/iter (+/- 173)
+test u128_div_rem_128_96_new   ... bench:         993 ns/iter (+/- 1,067)
+test u128_div_rem_128_96_std   ... bench:       3,741 ns/iter (+/- 2,889)
+test u128_rem_128_96_new       ... bench:       1,017 ns/iter (+/- 1,075)
+test u128_rem_128_96_std       ... bench:       3,691 ns/iter (+/- 172)
+(the 64 and 32 bit benches are not included here because the algorithm does not improve on these on this cpu)
 ```
