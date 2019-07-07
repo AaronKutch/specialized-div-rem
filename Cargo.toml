@@ -12,5 +12,8 @@ keywords = ["division", "int", "integer", "numerics", "math"]
 categories = ["algorithms", "no-std"]
 license = "MIT OR Apache-2.0"
 
+[features]
+asm = []
+
 [dev-dependencies] # for benchmarks
-rand = {version = "0.6.5", features = ["i128_support"] }
+rand = "0.7.0"

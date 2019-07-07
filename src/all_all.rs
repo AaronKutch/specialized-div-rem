@@ -1,26 +1,3 @@
-/// This function is unsafe, because if the quotient of `duo` and `div` does not fit in a `u64`,
-/// a floating point exception is thrown.
-#[cfg(target_arch = "x86_64")]
-#[inline]
-unsafe fn divrem_128_by_64(duo: u128, div: u64) -> (u64, u64) {
-    let quo: u64;
-    let rem: u64;
-    let duo_lo = duo as u64;
-    let duo_hi = (duo >> 64) as u64;
-    asm!("divq $4"
-        : "={rax}"(quo), "={rdx}"(rem)
-        : "{rax}"(duo_lo), "{rdx}"(duo_hi), "r"(div)
-        : "rax", "rdx"
-    );
-    return (quo, rem);
-}
-
-// for when the $uD by $uX function cannot be called
-#[cfg(not(target_arch = "x86_64"))]
-unsafe fn dummy128(duo: u128, div: u64) -> (u64, u64) {(duo as u64, div)}
-unsafe fn dummy64(duo: u64, div: u32) -> (u32, u32) {(duo as u32, div)}
-unsafe fn dummy32(duo: u32, div: u16) -> (u16, u16) {(duo as u16, div)}
-
 /// Generates a function that returns the quotient and remainder of unsigned integer division of
 /// `duo` by `div`. This uses $uX by $uX sized divisions. The function uses 3 different algorithms
 /// (and several conditionals for simple cases) that handle almost all numerical magnitudes
@@ -516,10 +493,3 @@ macro_rules! impl_div_rem {
         }
     }
 }
-
-impl_div_rem!(u32_div_rem, i32_div_rem, u32_i32_div_rem_test, 8u32, u8, u16, u32, i32, 0b11111u32, inline; inline; false, dummy32);
-impl_div_rem!(u64_div_rem, i64_div_rem, u64_i64_div_rem_test, 16u32, u16, u32, u64, i64, 0b111111u32, inline; inline; false, dummy64);
-#[cfg(not(target_arch = "x86_64"))]
-impl_div_rem!(u128_div_rem, i128_div_rem, u128_i128_div_rem_test, 32u32, u32, u64, u128, i128, 0b1111111u32, inline; inline; false, dummy128);
-#[cfg(target_arch = "x86_64")]
-impl_div_rem!(u128_div_rem, i128_div_rem, u128_i128_div_rem_test, 32u32, u32, u64, u128, i128, 0b1111111u32, inline; inline; true, divrem_128_by_64);
