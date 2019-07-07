@@ -26,22 +26,22 @@ When running `cargo bench` on this library, it runs division operations 32 times
 
 The names of the benchmarks specify 4 things:
 
-    - the type of integer being operated on,
-    - whether the quotient (`_div`) or remainder (`_rem`) or both (`div_rem`) are calculated,
-    - the size of the numbers being entered (specifically, how many lower bits the random integer
-      is being kept),
+    - the type of integer being operated on
+    - whether the quotient (`_div`) or remainder (`_rem`) or both (`div_rem`) are calculated
+    - the size of the numbers being entered (specifically, how many lower bits of the random integer
+      are being kept)
     - whether Rust's current algorithm or the algorithm in this crate is being used
 
 For example, the `u128_div_rem_126_64_new` benchmark tests how long it takes to find 32 quotients
-and remainders of a u128 random integer with the top 2 bits zeroed divided by a u128 random integer
+and remainders of a u128 random integer with the top 2 bits zeroed, divided by a u128 random integer
 with the top 64 bits zeroed.
 
 The `constant_u128_div_rem` benchmark is a hardcoded benchmark working on a constant array of integers.
-The `_baseline` benchmarks are just there to make sure that the process of adding the 32 answers together (to prevent the compiler from optimizing away code) does not take a lot of time.
+The `_baseline` benchmarks are just there to make sure that the process of adding the 32 answers together (to prevent the compiler from optimizing away benchmarking code) does not take a lot of time.
 
 The `_new` benches are using the algorithm in this library and the `_std` benches are using the algorithms Rust is using for `/` and `%`.
 
-On an Intel i3-3240, the benchmarks look like this.
+On an Intel i3-3240, the benchmarks look like this. Note that all of the 128 bit benches show improvement of the long division over the one Rust is using.
 
 ```
 test constant_u128_div_rem_new ... bench:       1,391 ns/iter (+/- 1,486)
@@ -67,7 +67,6 @@ test u128_rem_128_96_std       ... bench:       3,691 ns/iter (+/- 172)
 ```
 
 On an AMD FX-9800P RADEON R7
-Note that all of the 128 bit benches show improvement of the long division over the one Rust is using.
 
 ```
 test constant_u128_div_rem_new ... bench:       1,966 ns/iter (+/- 177)
