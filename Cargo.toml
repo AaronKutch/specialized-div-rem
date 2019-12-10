@@ -4,7 +4,7 @@ version = "0.0.5"
 edition = "2018"
 authors = ["Aaron Kutch <aaronkutch@att.net>"]
 
-description = "Specialized long division algorithms that are faster than binary long division (used by Rust) on some CPUs, especially 128 bit division on CPUs with hardwired 64 bit division."
+description = "Specialized division algorithms that are faster than binary long division on some CPUs, especially 128 bit division on CPUs with hardwired 64 bit division."
 repository = "https://github.com/AaronKutch/specialized-div-rem"
 documentation = "https://docs.rs/specialized-div-rem"
 readme = "README.md"
@@ -13,6 +13,7 @@ categories = ["algorithms", "no-std"]
 license = "MIT OR Apache-2.0"
 
 [features]
+no_std = []
 asm = []
 
 [dev-dependencies] # for benchmarks
