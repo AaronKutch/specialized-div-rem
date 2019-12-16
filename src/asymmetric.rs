@@ -13,7 +13,9 @@ macro_rules! impl_asymmetric {
         $($signed_attr:meta),* // attributes for the signed function
     ) => {
         /// Computes the quotient and remainder of `duo` divided by `div` and returns them as a
-        /// tuple. This is optimized for dividing integers with the same bitwidth as the largest
+        /// tuple.
+        /// 
+        /// This is optimized for dividing integers with the same bitwidth as the largest
         /// double register operand in an asymmetric division such as the x86-64 `divq` assembly
         /// instruction which can divide a 128 bit integer by a 64 bit integer if the quotient fits
         /// in 64 bits.
@@ -135,7 +137,9 @@ macro_rules! impl_asymmetric {
         }
 
         /// Computes the quotient and remainder of `duo` divided by `div` and returns them as a
-        /// tuple. This is optimized for dividing integers with the same bitwidth as the largest
+        /// tuple.
+        /// 
+        /// This is optimized for dividing integers with the same bitwidth as the largest
         /// double register operand in an asymmetric division such as the x86-64 `divq` assembly
         /// instruction which can divide a 128 bit integer by a 64 bit integer if the quotient fits
         /// in 64 bits.

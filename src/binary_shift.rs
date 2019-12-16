@@ -13,7 +13,9 @@ macro_rules! impl_binary_shift {
     ) => {
 
         /// Computes the quotient and remainder of `duo` divided by `div` and returns them as a
-        /// tuple. This uses binary shift long division (unless a fast path uses a smaller division
+        /// tuple.
+        /// 
+        /// This uses binary shift long division (unless a fast path uses a smaller division
         /// that uses some other algorithm).
         ///
         /// # Panics
@@ -164,7 +166,9 @@ macro_rules! impl_binary_shift {
         }
 
         /// Computes the quotient and remainder of `duo` divided by `div` and returns them as a
-        /// tuple. This uses binary shift long division (unless a fast path uses a smaller division
+        /// tuple.
+        /// 
+        /// This uses binary shift long division (unless a fast path uses a smaller division
         /// that uses some other algorithm).
         ///
         /// # Panics

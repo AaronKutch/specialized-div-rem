@@ -12,7 +12,9 @@ macro_rules! impl_trifecta {
         $($signed_attr:meta),* // attributes for the signed function
     ) => {
         /// Computes the quotient and remainder of `duo` divided by `div` and returns them as a
-        /// tuple. This is optimized for division of two integers with bit widths twice as large
+        /// tuple.
+        /// 
+        /// This is optimized for division of two integers with bit widths twice as large
         /// as the largest hardware integer division supported. Note that some architectures supply
         /// a division of an integer larger than register size by a regular sized integer (e.x.
         /// x86_64 has a `divq` instruction which can divide a 128 bit integer by a 64 bit integer).
@@ -394,7 +396,9 @@ macro_rules! impl_trifecta {
         }
 
         /// Computes the quotient and remainder of `duo` divided by `div` and returns them as a
-        /// tuple. This is optimized for division of two integers with bit widths twice as large
+        /// tuple.
+        /// 
+        /// This is optimized for division of two integers with bit widths twice as large
         /// as the largest hardware integer division supported. Note that some architectures supply
         /// a division of an integer larger than register size by a regular sized integer (e.x.
         /// x86_64 has a `divq` instruction which can divide a 128 bit integer by a 64 bit integer).
