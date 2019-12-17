@@ -7,6 +7,9 @@
 extern crate rand;
 
 #[macro_use]
+mod binary_long;
+
+#[macro_use]
 mod binary_shift;
 
 #[macro_use]
@@ -25,11 +28,11 @@ unsafe fn u128_div_u64(duo: u128, div: u64) -> (u64, u64) {
     let duo_lo = duo as u64;
     let duo_hi = (duo >> 64) as u64;
     asm!("divq $4"
-        : "={rax}"(quo), "={rdx}"(rem)
-        : "{rax}"(duo_lo), "{rdx}"(duo_hi), "r"(div)
-        : "rax", "rdx"
-    );
-    return (quo, rem)
+    : "={rax}"(quo), "={rdx}"(rem)
+    : "{rax}"(duo_lo), "{rdx}"(duo_hi), "r"(div)
+    : "rax", "rdx"
+);
+return (quo, rem)
 }
 
 // for when the $uD by $uX assembly function cannot be called
@@ -44,10 +47,128 @@ unsafe fn u32_div_u16(duo: u32, div: u16) -> (u16, u16) {
     ((duo / (div as u32)) as u16, (duo % (div as u32)) as u16)
 }
 
+fn u16_div_u16(duo: u16, div: u16) -> (u16, u16) {
+    (duo / div, duo % div)
+}
+fn u32_div_u32(duo: u32, div: u32) -> (u32, u32) {
+    (duo / div, duo % div)
+}
+fn u64_div_u64(duo: u64, div: u64) -> (u64, u64) {
+    (duo / div, duo % div)
+}
+
+macro_rules! test {
+    (
+        $n:expr, // the number of bits in a $iX or $uX
+        $uX:ident, // unsigned integer that will be shifted
+        $iX:ident, // signed version of $uX
+        // list of triples of the test name, the unsigned division function, and the signed
+        // division function
+        $($test_name:ident, $unsigned_name:ident, $signed_name:ident);+
+    ) => {
+        $(
+            #[test]
+            fn $test_name() {
+                use rand::random;
+                // checks all possible single continuous strings of ones (except when all bits
+                // are zero) uses about 68 million iterations for T = u128
+                let mut lhs0: $uX = 1;
+                for i0 in 1..=$n {
+                    let mut lhs1 = lhs0;
+                    for i1 in 0..i0 {
+                        let mut rhs0: $uX = 1;
+                        for i2 in 1..=$n {
+                            let mut rhs1 = rhs0;
+                            for i3 in 0..i2 {
+                                if $unsigned_name(lhs1,rhs1) !=
+                                    (
+                                        lhs1.wrapping_div(rhs1),
+                                        lhs1.wrapping_rem(rhs1)
+                                    ) {
+                                    println!(
+                                        "lhs:{} rhs:{} expected:({}, {}) found:({},{})",
+                                        lhs1,
+                                        rhs1,
+                                        lhs1.wrapping_div(rhs1),
+                                        lhs1.wrapping_rem(rhs1),
+                                        $unsigned_name(lhs1,rhs1).0,
+                                        $unsigned_name(lhs1,rhs1).1
+                                    );
+                                    panic!();
+                                }
+                                if $signed_name(lhs1 as $iX,rhs1 as $iX) !=
+                                    (
+                                        (lhs1 as $iX).wrapping_div(rhs1 as $iX),
+                                        (lhs1 as $iX).wrapping_rem(rhs1 as $iX)
+                                    ) {
+                                    println!(
+                                        "lhs:{} rhs:{} expected:({}, {}) found:({},{})",
+                                        lhs1,
+                                        rhs1,
+                                        lhs1.wrapping_div(rhs1),
+                                        lhs1.wrapping_rem(rhs1),
+                                        $signed_name(lhs1 as $iX,rhs1 as $iX).0,
+                                        $signed_name(lhs1 as $iX,rhs1 as $iX).1
+                                    );
+                                    panic!();
+                                }
+
+                                rhs1 ^= 1 << i3;
+                            }
+                            rhs0 <<= 1;
+                            rhs0 |= 1;
+                        }
+                        lhs1 ^= 1 << i1;
+                    }
+                    lhs0 <<= 1;
+                    lhs0 |= 1;
+                }
+                // binary fuzzer
+                let mut lhs: $uX = 0;
+                let mut rhs: $uX = 0;
+                let mut ones: $uX;
+                // creates a mask for indexing the bits of the type
+                let bit_selector_max = $n - 1;
+                for _ in 0..10_000_000 {
+                    for _ in 0..4 {
+                        let r0: u32 = bit_selector_max & random::<u32>();
+                        ones = !0 >> r0;
+                        let r1: u32 = bit_selector_max & random::<u32>();
+                        let mask = ones.rotate_left(r1);
+                        match (random(),random(),random()) {
+                            (false,false,false) => lhs |= mask,
+                            (false,false,true) => lhs &= mask,
+                            (false,true,_) => lhs ^= mask,
+                            (true,false,false) => rhs |= mask,
+                            (true,false,true) => rhs &= mask,
+                            (true,true,_) => rhs ^= mask,
+                        }
+                    }
+                    if rhs != 0 {
+                        assert_eq!(
+                            (lhs.wrapping_div(rhs), lhs.wrapping_rem(rhs)),
+                            $unsigned_name(lhs,rhs)
+                        );
+                    }
+                }
+            }
+        )+
+    }
+}
+
+impl_binary_long!(
+    u32_div_rem_binary_long,
+    i32_div_rem_binary_long,
+    32,
+    u32,
+    i32,
+    inline;
+    inline
+);
 impl_binary_shift!(
     u32_div_rem_binary_shift,
     i32_div_rem_binary_shift,
-    div_rem_binary_shift_32,
+    u16_div_u16,
     8,
     u8,
     u16,
@@ -59,7 +180,7 @@ impl_binary_shift!(
 impl_trifecta!(
     u32_div_rem_trifecta,
     i32_div_rem_trifecta,
-    div_rem_trifecta_32,
+    u16_div_u16,
     8,
     u8,
     u16,
@@ -71,7 +192,7 @@ impl_trifecta!(
 impl_asymmetric!(
     u32_div_rem_asymmetric,
     i32_div_rem_asymmetric,
-    div_rem_asymmetric_32,
+    u16_div_u16,
     u32_div_u16,
     8,
     u8,
@@ -81,10 +202,37 @@ impl_asymmetric!(
     inline;
     inline
 );
+test!(
+    32,
+    u32,
+    i32,
+    div_rem_binary_long_32,
+    u32_div_rem_binary_long,
+    i32_div_rem_binary_long;
+    div_rem_binary_shift_32,
+    u32_div_rem_binary_shift,
+    i32_div_rem_binary_shift;
+    div_rem_trifecta_32,
+    u32_div_rem_trifecta,
+    i32_div_rem_trifecta;
+    div_rem_asymmetric_32,
+    u32_div_rem_asymmetric,
+    i32_div_rem_asymmetric
+);
+
+impl_binary_long!(
+    u64_div_rem_binary_long,
+    i64_div_rem_binary_long,
+    64,
+    u64,
+    i64,
+    inline;
+    inline
+);
 impl_binary_shift!(
     u64_div_rem_binary_shift,
     i64_div_rem_binary_shift,
-    div_rem_binary_shift_64,
+    u32_div_u32,
     16,
     u16,
     u32,
@@ -96,7 +244,7 @@ impl_binary_shift!(
 impl_trifecta!(
     u64_div_rem_trifecta,
     i64_div_rem_trifecta,
-    div_rem_trifecta_64,
+    u32_div_u32,
     16,
     u16,
     u32,
@@ -108,7 +256,7 @@ impl_trifecta!(
 impl_asymmetric!(
     u64_div_rem_asymmetric,
     i64_div_rem_asymmetric,
-    div_rem_asymmetric_64,
+    u32_div_u32,
     u64_div_u32,
     16,
     u16,
@@ -118,10 +266,37 @@ impl_asymmetric!(
     inline;
     inline
 );
+test!(
+    64,
+    u64,
+    i64,
+    div_rem_binary_long_64,
+    u64_div_rem_binary_long,
+    i64_div_rem_binary_long;
+    div_rem_binary_shift_64,
+    u64_div_rem_binary_shift,
+    i64_div_rem_binary_shift;
+    div_rem_trifecta_64,
+    u64_div_rem_trifecta,
+    i64_div_rem_trifecta;
+    div_rem_asymmetric_64,
+    u64_div_rem_asymmetric,
+    i64_div_rem_asymmetric
+);
+
+impl_binary_long!(
+    u128_div_rem_binary_long,
+    i128_div_rem_binary_long,
+    128,
+    u128,
+    i128,
+    inline;
+    inline
+);
 impl_binary_shift!(
     u128_div_rem_binary_shift,
     i128_div_rem_binary_shift,
-    div_rem_binary_shift_128,
+    u64_div_u64,
     32,
     u32,
     u64,
@@ -133,7 +308,7 @@ impl_binary_shift!(
 impl_trifecta!(
     u128_div_rem_trifecta,
     i128_div_rem_trifecta,
-    div_rem_trifecta_128,
+    u64_div_u64,
     32,
     u32,
     u64,
@@ -145,7 +320,7 @@ impl_trifecta!(
 impl_asymmetric!(
     u128_div_rem_asymmetric,
     i128_div_rem_asymmetric,
-    div_rem_asymmetric_128,
+    u64_div_u64,
     u128_div_u64,
     32,
     u32,
@@ -154,4 +329,21 @@ impl_asymmetric!(
     i128,
     inline;
     inline
+);
+test!(
+    128,
+    u128,
+    i128,
+    div_rem_binary_long_128,
+    u128_div_rem_binary_long,
+    i128_div_rem_binary_long;
+    div_rem_binary_shift_128,
+    u128_div_rem_binary_shift,
+    i128_div_rem_binary_shift;
+    div_rem_trifecta_128,
+    u128_div_rem_trifecta,
+    i128_div_rem_trifecta;
+    div_rem_asymmetric_128,
+    u128_div_rem_asymmetric,
+    i128_div_rem_asymmetric
 );

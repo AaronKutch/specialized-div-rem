@@ -2,7 +2,7 @@ macro_rules! impl_trifecta {
     (
         $unsigned_name:ident, // name of the unsigned function
         $signed_name:ident, // name of the signed function
-        $test_name:ident, // name of the test function
+        $half_division:ident, // function for division of a $uX by a $uX
         $n_h:expr, // the number of bits in $iH or $uH
         $uH:ident, // unsigned integer with half the bit width of $uX
         $uX:ident, // the largest division instruction that this function calls operates on this
@@ -87,9 +87,10 @@ macro_rules! impl_trifecta {
             if duo_lz >= n {
                 // `duo < 2^n` so it will fit in a $uX. `div` will also fit in a $uX (because of the
                 // `div_lz <= duo_lz` branch) so no numerical error.
+                let tmp = $half_division(duo as $uX, div as $uX);
                 return (
-                    (duo as $uX).wrapping_div(div as $uX) as $uD,
-                    (duo as $uX).wrapping_rem(div as $uX) as $uD
+                    tmp.0 as $uD,
+                    tmp.1 as $uD
                 )
             }
             
@@ -101,27 +102,25 @@ macro_rules! impl_trifecta {
             // short division branch
             if div_lz >= (n + $n_h) {
                 // `1 <= div < {2^duo_sb, 2^n_h}`
-                let div_lo = (div as $uH) as $uX;
-                
                 let duo_hi = (duo >> n) as $uX;
-                let quo_hi = duo_hi.wrapping_div(div_lo);
-                //all of the `rem_{}`s cannot be larger than `$uH::MAX`,
-                //since `div` cannot be larger than `$uH::MAX`.
-                let rem_2 = duo_hi.wrapping_rem(div_lo) as $uH;
-                
+                let div_0 = div as $uH as $uX;
+                let (quo_hi, rem_3) = $half_division(duo_hi, div_0);
+
                 let duo_mid =
-                (((duo >> $n_h) as $uH) as $uX)
-                | ((rem_2 as $uX) << $n_h);
-                let quo_1 = duo_mid.wrapping_div(div_lo) as $uH;
-                let rem_1 = duo_mid.wrapping_rem(div_lo) as $uH;
-                
+                    ((duo >> $n_h) as $uH as $uX)
+                    | (rem_3 << $n_h);
+                let (quo_1, rem_2) = $half_division(duo_mid, div_0);
+
                 let duo_lo =
-                ((duo as $uH) as $uX)
-                | ((rem_1 as $uX) << $n_h);
-                let quo_0 = duo_lo.wrapping_div(div_lo) as $uH;
+                    (duo as $uH as $uX)
+                    | (rem_2 << $n_h);
+                let (quo_0, rem_1) = $half_division(duo_lo, div_0);
+
                 return (
-                    (quo_0 as $uD) | ((quo_1 as $uD) << $n_h) | ((quo_hi as $uD) << n),
-                    (duo_lo.wrapping_rem(div_lo) as $uH) as $uD
+                    (quo_0 as $uD)
+                    | ((quo_1 as $uD) << $n_h)
+                    | ((quo_hi as $uD) << n),
+                    rem_1 as $uD
                 )
             }
             
@@ -233,7 +232,7 @@ macro_rules! impl_trifecta {
                 let shift = n.wrapping_sub(duo_lz);
                 let duo_sig_n = (duo >> shift) as $uX;
                 let div_sig_n = (div >> shift) as $uX;
-                let mul = duo_sig_n.wrapping_div(div_sig_n);
+                let mul = $half_division(duo_sig_n, div_sig_n).0;
                 // inline `n` bit by `n_d` bit multiplication and overflow check (we cannot do
                 // `mul * div > duo` directly because of possibility of overflow beyond 128 bits)
                 // duo cannot be more than `2^n_d - 1`, and overflow means a value more than that
@@ -326,7 +325,7 @@ macro_rules! impl_trifecta {
                 let duo_sig_n = (duo >> duo_lesser_places) as $uX;
 
                 if div_lesser_places <= duo_lesser_places {
-                    let mul = duo_sig_n.wrapping_div(div_sig_n_h_add1) as $uD;
+                    let mul = $half_division(duo_sig_n, div_sig_n_h_add1).0 as $uD;
                     let place = duo_lesser_places.wrapping_sub(div_lesser_places);
 
                     //addition to the quotient
@@ -340,7 +339,7 @@ macro_rules! impl_trifecta {
                     let shift = n.wrapping_sub(duo_lz);
                     let duo_sig_n = (duo >> shift) as $uX;
                     let div_sig_n = (div >> shift) as $uX;
-                    let mul = duo_sig_n.wrapping_div(div_sig_n);
+                    let mul = $half_division(duo_sig_n, div_sig_n).0;
                     let div_lo = div as $uX;
                     let div_hi = (div >> n) as $uX;
 
@@ -387,9 +386,10 @@ macro_rules! impl_trifecta {
                 // branches), but it is not worth it to unroll further.
                 if duo_lz >= n {
                     // simple division and addition
+                    let tmp = $half_division(duo as $uX, div as $uX);
                     return (
-                        quo.wrapping_add((duo as $uX).wrapping_div(div as $uX) as $uD),
-                        (duo as $uX).wrapping_rem(div as $uX) as $uD
+                        quo.wrapping_add(tmp.0 as $uD),
+                        tmp.1 as $uD
                     )
                 }
             }
@@ -433,79 +433,6 @@ macro_rules! impl_trifecta {
                     let t = $unsigned_name(duo.wrapping_neg() as $uD,div.wrapping_neg() as $uD);
                     (t.0 as $iD,(t.1 as $iD).wrapping_neg())
                 },
-            }
-        }
-
-        #[test]
-        fn $test_name() {
-            type T = $uD;
-            let n = $n_h * 4;
-            // checks all possible single continuous strings of ones (except when all bits are zero)
-            // uses about 68 million iterations for T = u128
-            let mut lhs0: T = 1;
-            for i0 in 1..=n {
-                let mut lhs1 = lhs0;
-                for i1 in 0..i0 {
-                    let mut rhs0: T = 1;
-                    for i2 in 1..=n {
-                        let mut rhs1 = rhs0;
-                        for i3 in 0..i2 {
-                            assert_eq!(
-                                $unsigned_name(lhs1,rhs1),
-                                (
-                                    lhs1.wrapping_div(rhs1),
-                                    lhs1.wrapping_rem(rhs1)
-                                )
-                            );
-                            assert_eq!(
-                                $signed_name(lhs1 as $iD,rhs1 as $iD),
-                                (
-                                    (lhs1 as $iD).wrapping_div(rhs1 as $iD),
-                                    (lhs1 as $iD).wrapping_rem(rhs1 as $iD)
-                                )
-                            );
-                            rhs1 ^= 1 << i3;
-                        }
-                        rhs0 <<= 1;
-                        rhs0 |= 1;
-                    }
-                    lhs1 ^= 1 << i1;
-                }
-                lhs0 <<= 1;
-                lhs0 |= 1;
-            }
-            // binary fuzzer
-            use rand::random;
-            let mut lhs: T = 0;
-            let mut rhs: T = 0;
-            let mut ones: T;
-            // creates a mask for indexing the bits of a $uD
-            let bit_selector_max = core::$uX::MAX.count_ones() - 1;
-            for _ in 0..10_000_000 {
-                let r0: u32 = bit_selector_max & random::<u32>();
-                ones = 0;
-                for _ in 0..r0 {
-                    ones <<= 1;
-                    ones |= 1;
-                }
-                let r1: u32 = bit_selector_max & random::<u32>();
-                let mask = ones.rotate_left(r1);
-                match (random(),random(),random()) {
-                    (false,false,false) => lhs |= mask,
-                    (false,false,true) => lhs &= mask,
-                    (false,true,false) => lhs ^= mask,
-                    (false,true,true) => lhs ^= mask,
-                    (true,false,false) => rhs |= mask,
-                    (true,false,true) => rhs &= mask,
-                    (true,true,false) => rhs ^= mask,
-                    (true,true,true) => rhs ^= mask,
-                }
-                if rhs != 0 {
-                    assert_eq!(
-                        (lhs.wrapping_div(rhs), lhs.wrapping_rem(rhs)),
-                        $unsigned_name(lhs,rhs)
-                    );
-                }
             }
         }
     }
