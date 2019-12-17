@@ -22,7 +22,7 @@ mod asymmetric;
 /// fit in a `u64`, a floating point exception is thrown.
 #[cfg(all(target_arch = "x86_64", feature = "asm"))]
 #[inline]
-unsafe fn u128_div_u64(duo: u128, div: u64) -> (u64, u64) {
+unsafe fn u128_by_u64_div_rem(duo: u128, div: u64) -> (u64, u64) {
     let quo: u64;
     let rem: u64;
     let duo_lo = duo as u64;
@@ -37,23 +37,28 @@ return (quo, rem)
 
 // for when the $uD by $uX assembly function cannot be called
 #[cfg(any(not(target_arch = "x86_64"), not(feature = "asm")))]
-unsafe fn u128_div_u64(duo: u128, div: u64) -> (u64, u64) {
+#[inline]
+unsafe fn u128_by_u64_div_rem(duo: u128, div: u64) -> (u64, u64) {
     ((duo / (div as u128)) as u64, (duo % (div as u128)) as u64)
 }
-unsafe fn u64_div_u32(duo: u64, div: u32) -> (u32, u32) {
+#[inline]
+unsafe fn u64_by_u32_div_rem(duo: u64, div: u32) -> (u32, u32) {
     ((duo / (div as u64)) as u32, (duo % (div as u64)) as u32)
 }
-unsafe fn u32_div_u16(duo: u32, div: u16) -> (u16, u16) {
+#[inline]
+unsafe fn u32_by_u16_div_rem(duo: u32, div: u16) -> (u16, u16) {
     ((duo / (div as u32)) as u16, (duo % (div as u32)) as u16)
 }
-
-fn u16_div_u16(duo: u16, div: u16) -> (u16, u16) {
+#[inline]
+fn u16_by_u16_div_rem(duo: u16, div: u16) -> (u16, u16) {
     (duo / div, duo % div)
 }
-fn u32_div_u32(duo: u32, div: u32) -> (u32, u32) {
+#[inline]
+fn u32_by_u32_div_rem(duo: u32, div: u32) -> (u32, u32) {
     (duo / div, duo % div)
 }
-fn u64_div_u64(duo: u64, div: u64) -> (u64, u64) {
+#[inline]
+fn u64_by_u64_div_rem(duo: u64, div: u64) -> (u64, u64) {
     (duo / div, duo % div)
 }
 
@@ -168,7 +173,7 @@ impl_binary_long!(
 impl_binary_shift!(
     u32_div_rem_binary_shift,
     i32_div_rem_binary_shift,
-    u16_div_u16,
+    u16_by_u16_div_rem,
     8,
     u8,
     u16,
@@ -180,7 +185,7 @@ impl_binary_shift!(
 impl_trifecta!(
     u32_div_rem_trifecta,
     i32_div_rem_trifecta,
-    u16_div_u16,
+    u16_by_u16_div_rem,
     8,
     u8,
     u16,
@@ -192,8 +197,8 @@ impl_trifecta!(
 impl_asymmetric!(
     u32_div_rem_asymmetric,
     i32_div_rem_asymmetric,
-    u16_div_u16,
-    u32_div_u16,
+    u16_by_u16_div_rem,
+    u32_by_u16_div_rem,
     8,
     u8,
     u16,
@@ -232,7 +237,7 @@ impl_binary_long!(
 impl_binary_shift!(
     u64_div_rem_binary_shift,
     i64_div_rem_binary_shift,
-    u32_div_u32,
+    u32_by_u32_div_rem,
     16,
     u16,
     u32,
@@ -244,7 +249,7 @@ impl_binary_shift!(
 impl_trifecta!(
     u64_div_rem_trifecta,
     i64_div_rem_trifecta,
-    u32_div_u32,
+    u32_by_u32_div_rem,
     16,
     u16,
     u32,
@@ -256,8 +261,8 @@ impl_trifecta!(
 impl_asymmetric!(
     u64_div_rem_asymmetric,
     i64_div_rem_asymmetric,
-    u32_div_u32,
-    u64_div_u32,
+    u32_by_u32_div_rem,
+    u64_by_u32_div_rem,
     16,
     u16,
     u32,
@@ -296,7 +301,7 @@ impl_binary_long!(
 impl_binary_shift!(
     u128_div_rem_binary_shift,
     i128_div_rem_binary_shift,
-    u64_div_u64,
+    u64_by_u64_div_rem,
     32,
     u32,
     u64,
@@ -308,7 +313,7 @@ impl_binary_shift!(
 impl_trifecta!(
     u128_div_rem_trifecta,
     i128_div_rem_trifecta,
-    u64_div_u64,
+    u64_by_u64_div_rem,
     32,
     u32,
     u64,
@@ -320,8 +325,8 @@ impl_trifecta!(
 impl_asymmetric!(
     u128_div_rem_asymmetric,
     i128_div_rem_asymmetric,
-    u64_div_u64,
-    u128_div_u64,
+    u64_by_u64_div_rem,
+    u128_by_u64_div_rem,
     32,
     u32,
     u64,
