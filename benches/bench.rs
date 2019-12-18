@@ -164,8 +164,8 @@ bencher!(
     u64_div_rem_48_38_std;
     u64_div_rem_binary_long,
     u64_div_rem_48_38_binary_long;
-    u64_div_rem_binary_shift,
-    u64_div_rem_48_38_binary_shift;
+    u64_div_rem_delegate,
+    u64_div_rem_48_38_delegate;
     u64_div_rem_asymmetric,
     u64_div_rem_48_38_asymmetric;
     u64_div_rem_trifecta,
@@ -180,8 +180,8 @@ bencher!(
     u64_div_rem_48_16_std;
     u64_div_rem_binary_long,
     u64_div_rem_48_16_binary_long;
-    u64_div_rem_binary_shift,
-    u64_div_rem_48_16_binary_shift;
+    u64_div_rem_delegate,
+    u64_div_rem_48_16_delegate;
     u64_div_rem_asymmetric,
     u64_div_rem_48_16_asymmetric;
     u64_div_rem_trifecta,
@@ -196,8 +196,8 @@ bencher!(
     u64_div_rem_64_32_std;
     u64_div_rem_binary_long,
     u64_div_rem_64_32_binary_long;
-    u64_div_rem_binary_shift,
-    u64_div_rem_64_32_binary_shift;
+    u64_div_rem_delegate,
+    u64_div_rem_64_32_delegate;
     u64_div_rem_asymmetric,
     u64_div_rem_64_32_asymmetric;
     u64_div_rem_trifecta,
@@ -212,8 +212,8 @@ bencher!(
     u128_div_rem_96_70_std;
     u128_div_rem_binary_long,
     u128_div_rem_96_70_binary_long;
-    u128_div_rem_binary_shift,
-    u128_div_rem_96_70_binary_shift;
+    u128_div_rem_delegate,
+    u128_div_rem_96_70_delegate;
     u128_div_rem_asymmetric,
     u128_div_rem_96_70_asymmetric;
     u128_div_rem_trifecta,
@@ -228,8 +228,8 @@ bencher!(
     u128_div_rem_96_32_std;
     u128_div_rem_binary_long,
     u128_div_rem_96_32_binary_long;
-    u128_div_rem_binary_shift,
-    u128_div_rem_96_32_binary_shift;
+    u128_div_rem_delegate,
+    u128_div_rem_96_32_delegate;
     u128_div_rem_asymmetric,
     u128_div_rem_96_32_asymmetric;
     u128_div_rem_trifecta,
@@ -245,8 +245,8 @@ bencher!(
     i128_div_rem_96_32_std;
     i128_div_rem_binary_long,
     i128_div_rem_96_32_binary_long;
-    i128_div_rem_binary_shift,
-    i128_div_rem_96_32_binary_shift;
+    i128_div_rem_delegate,
+    i128_div_rem_96_32_delegate;
     i128_div_rem_asymmetric,
     i128_div_rem_96_32_asymmetric;
     i128_div_rem_trifecta,
@@ -259,8 +259,8 @@ bencher!(
     64,
     u128_div_rem_std,
     u128_div_rem_128_64_std;
-    u128_div_rem_binary_shift,
-    u128_div_rem_128_64_binary_shift;
+    u128_div_rem_delegate,
+    u128_div_rem_128_64_delegate;
     u128_div_rem_asymmetric,
     u128_div_rem_128_64_asymmetric;
     u128_div_rem_trifecta,
@@ -276,8 +276,8 @@ bencher!(
     u128_div_rem_128_96_std;
     u128_div_rem_binary_long,
     u128_div_rem_128_96_binary_long;
-    u128_div_rem_binary_shift,
-    u128_div_rem_128_96_binary_shift;
+    u128_div_rem_delegate,
+    u128_div_rem_128_96_delegate;
     u128_div_rem_asymmetric,
     u128_div_rem_128_96_asymmetric;
     u128_div_rem_trifecta,
@@ -293,8 +293,8 @@ bencher!(
     u128_div_rem_120_120_std;
     u128_div_rem_binary_long,
     u128_div_rem_120_120_binary_long;
-    u128_div_rem_binary_shift,
-    u128_div_rem_120_120_binary_shift;
+    u128_div_rem_delegate,
+    u128_div_rem_120_120_delegate;
     u128_div_rem_asymmetric,
     u128_div_rem_120_120_asymmetric;
     u128_div_rem_trifecta,
@@ -310,8 +310,8 @@ bencher!(
     u128_div_rem_128_8_std;
     u128_div_rem_binary_long,
     u128_div_rem_128_8_binary_long;
-    u128_div_rem_binary_shift,
-    u128_div_rem_128_8_binary_shift;
+    u128_div_rem_delegate,
+    u128_div_rem_128_8_delegate;
     u128_div_rem_asymmetric,
     u128_div_rem_128_8_asymmetric;
     u128_div_rem_trifecta,

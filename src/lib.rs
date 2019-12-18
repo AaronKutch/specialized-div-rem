@@ -10,7 +10,7 @@ extern crate rand;
 mod binary_long;
 
 #[macro_use]
-mod binary_shift;
+mod delegate;
 
 #[macro_use]
 mod trifecta;
@@ -49,6 +49,7 @@ unsafe fn u64_by_u32_div_rem(duo: u64, div: u32) -> (u32, u32) {
 unsafe fn u32_by_u16_div_rem(duo: u32, div: u16) -> (u16, u16) {
     ((duo / (div as u32)) as u16, (duo % (div as u32)) as u16)
 }
+
 #[inline]
 fn u16_by_u16_div_rem(duo: u16, div: u16) -> (u16, u16) {
     (duo / div, duo % div)
@@ -161,6 +162,51 @@ macro_rules! test {
     }
 }
 
+// Note: one reason for the macros having a `$half_division:ident` instead of directly calling the
+// `/` and `%` builtin operators is that it makes benching what happens when the larger divisions
+// use different algorithms for their half division much easier. 
+// One result of this is that, when hardware division is not availiable and the u64 divisions
+// require a `u32_div_rem_binary_long` half sized division, the fastest algorithm is the
+// `u64_div_rem_delegate` algorithm. When the u128 sized divisions in turn use
+// `u64_div_rem_delegate` as their half sized division, the fastest algorithm is
+// `u128_div_rem_trifecta`.
+
+// for completeness of smaller divisions for small CPUs
+impl_binary_long!(
+    u8_div_rem_binary_long,
+    i8_div_rem_binary_long,
+    8,
+    u8,
+    i8,
+    inline;
+    inline
+);
+test!(
+    8,
+    u8,
+    i8,
+    div_rem_binary_long_8,
+    u8_div_rem_binary_long,
+    i8_div_rem_binary_long
+);
+impl_binary_long!(
+    u16_div_rem_binary_long,
+    i16_div_rem_binary_long,
+    16,
+    u16,
+    i16,
+    inline;
+    inline
+);
+test!(
+    16,
+    u16,
+    i16,
+    div_rem_binary_long_16,
+    u16_div_rem_binary_long,
+    i16_div_rem_binary_long
+);
+
 impl_binary_long!(
     u32_div_rem_binary_long,
     i32_div_rem_binary_long,
@@ -170,9 +216,9 @@ impl_binary_long!(
     inline;
     inline
 );
-impl_binary_shift!(
-    u32_div_rem_binary_shift,
-    i32_div_rem_binary_shift,
+impl_delegate!(
+    u32_div_rem_delegate,
+    i32_div_rem_delegate,
     u16_by_u16_div_rem,
     8,
     u8,
@@ -214,9 +260,9 @@ test!(
     div_rem_binary_long_32,
     u32_div_rem_binary_long,
     i32_div_rem_binary_long;
-    div_rem_binary_shift_32,
-    u32_div_rem_binary_shift,
-    i32_div_rem_binary_shift;
+    div_rem_delegate_32,
+    u32_div_rem_delegate,
+    i32_div_rem_delegate;
     div_rem_trifecta_32,
     u32_div_rem_trifecta,
     i32_div_rem_trifecta;
@@ -234,9 +280,9 @@ impl_binary_long!(
     inline;
     inline
 );
-impl_binary_shift!(
-    u64_div_rem_binary_shift,
-    i64_div_rem_binary_shift,
+impl_delegate!(
+    u64_div_rem_delegate,
+    i64_div_rem_delegate,
     u32_by_u32_div_rem,
     16,
     u16,
@@ -278,9 +324,9 @@ test!(
     div_rem_binary_long_64,
     u64_div_rem_binary_long,
     i64_div_rem_binary_long;
-    div_rem_binary_shift_64,
-    u64_div_rem_binary_shift,
-    i64_div_rem_binary_shift;
+    div_rem_delegate_64,
+    u64_div_rem_delegate,
+    i64_div_rem_delegate;
     div_rem_trifecta_64,
     u64_div_rem_trifecta,
     i64_div_rem_trifecta;
@@ -298,9 +344,9 @@ impl_binary_long!(
     inline;
     inline
 );
-impl_binary_shift!(
-    u128_div_rem_binary_shift,
-    i128_div_rem_binary_shift,
+impl_delegate!(
+    u128_div_rem_delegate,
+    i128_div_rem_delegate,
     u64_by_u64_div_rem,
     32,
     u32,
@@ -342,9 +388,9 @@ test!(
     div_rem_binary_long_128,
     u128_div_rem_binary_long,
     i128_div_rem_binary_long;
-    div_rem_binary_shift_128,
-    u128_div_rem_binary_shift,
-    i128_div_rem_binary_shift;
+    div_rem_delegate_128,
+    u128_div_rem_delegate,
+    i128_div_rem_delegate;
     div_rem_trifecta_128,
     u128_div_rem_trifecta,
     i128_div_rem_trifecta;

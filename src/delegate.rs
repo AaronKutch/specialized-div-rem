@@ -1,4 +1,4 @@
-macro_rules! impl_binary_shift {
+macro_rules! impl_delegate {
     (
         $unsigned_name:ident, // name of the unsigned function
         $signed_name:ident, // name of the signed function
@@ -15,8 +15,11 @@ macro_rules! impl_binary_shift {
         /// Computes the quotient and remainder of `duo` divided by `div` and returns them as a
         /// tuple.
         /// 
-        /// This uses binary shift long division (unless a fast path uses a smaller division
-        /// that uses some other algorithm).
+        /// This uses binary shift long division, but if it can delegates work to a smaller
+        /// division. This function is used for CPUs with a register size smaller than the division
+        /// size, and that do not have fast multiplication or division hardware. For CPUs with a
+        /// register size equal to the division size, the `_binary_long` functions are probably
+        /// faster.
         ///
         /// # Panics
         ///
@@ -25,10 +28,6 @@ macro_rules! impl_binary_shift {
             #[$unsigned_attr]
         )*
         pub fn $unsigned_name(duo: $uD, div: $uD) -> ($uD,$uD) {
-            // Note: `wrapping_` functions are used for add and subtract for better debug
-            // performance, but others such as shift left do not use this because they always
-            // have bounds checks anyway.
-
             // the number of bits in a $uX
             let n = $n_h * 2;
 
@@ -169,8 +168,11 @@ macro_rules! impl_binary_shift {
         /// Computes the quotient and remainder of `duo` divided by `div` and returns them as a
         /// tuple.
         /// 
-        /// This uses binary shift long division (unless a fast path uses a smaller division
-        /// that uses some other algorithm).
+        /// This uses binary shift long division, but if it can delegates work to a smaller
+        /// division. This function is used for CPUs with a register size smaller than the division
+        /// size, and that do not have fast multiplication or division hardware. For CPUs with a
+        /// register size equal to the division size, the `_binary_long` functions are probably
+        /// faster.
         ///
         /// # Panics
         ///

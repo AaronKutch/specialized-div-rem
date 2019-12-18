@@ -1,18 +1,20 @@
 # Specialized Division and Remainder Algorithms
 
-This crate provides the algorithms, tests, and benchmarks for three different division functions:
+This crate provides the algorithms, tests, and benchmarks for four different division functions:
 
-- The `_binary_shift` functions for CPUs without hardware dividers
+- The `_binary_long` functions for CPUs without hardware dividers
+- The `_delegate` functions for 
 - The `_trifecta` functions designed for dividing integers larger than the largest hardware division
   a CPU supports
 - The `_asymmetric` functions similar to the `_trifecta` functions, except optimized for CPUs with
   an asymmetric sized hardware division function such as x86_64's `divq`
 
-Note that setting the the `asm` feature flag and compiling with `--cpu=native` can cause a
-significant performance improvement for these functions, and is absolutely required for
-`_asymmetric` to work efficiently.
+Note that setting the the `asm` feature flag can cause a significant performance improvement for
+these functions, and is absolutely required for `_asymmetric` to work efficiently.
 
-Most division algorithms end up doing most of the work to get both the quotient and remainder, which is why these functions return both (and the compiler can inline and optimize away unused results and calculations).
+Most division algorithms end up doing most of the work to get both the quotient and remainder, which
+is why these functions return both (and the compiler can inline and optimize away unused results and
+calculations).
 
 On naming conventions:
 All `_div` functions should really be named `_quo` (quotient) functions, and it would stop the name

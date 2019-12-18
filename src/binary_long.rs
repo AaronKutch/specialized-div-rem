@@ -12,7 +12,8 @@ macro_rules! impl_binary_long {
         /// Computes the quotient and remainder of `duo` divided by `div` and returns them as a
         /// tuple.
         /// 
-        /// This uses binary shift long division only.
+        /// This uses binary shift long division only, and is designed for CPUs without fast
+        /// multiplication or division hardware.
         ///
         /// # Panics
         ///
@@ -62,6 +63,8 @@ macro_rules! impl_binary_long {
                 }
 
                 if duo == 0 {
+                    // must have this branch for inputs that are not as random as what is used in
+                    // the benchmarks
                     return (quo << shift, duo)
                 }
                 if shift == 0 {
@@ -76,7 +79,8 @@ macro_rules! impl_binary_long {
         /// Computes the quotient and remainder of `duo` divided by `div` and returns them as a
         /// tuple.
         /// 
-        /// This uses binary shift long division only.
+        /// This uses binary shift long division only, and is designed for CPUs without fast
+        /// multiplication or division hardware.
         ///
         /// # Panics
         ///
