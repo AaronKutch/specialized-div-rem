@@ -416,6 +416,21 @@ macro_rules! impl_trifecta {
             #[$signed_attr]
         )*
         pub fn $signed_name(duo: $iD, div: $iD) -> ($iD,$iD) {
+            // Note: there is a way of doing this without any branches, but it is unfortunately
+            // significantly slower
+            // let n_d = $n_h * 4;
+            // let duo_s = duo >> (n_d - 1);
+            // let div_s = div >> (n_d - 1);
+            // let duo = (duo ^ duo_s).wrapping_sub(duo_s);
+            // let div = (div ^ div_s).wrapping_sub(div_s);
+            // let quo_s = duo_s ^ div_s;
+            // let rem_s = duo_s;
+            // let tmp = $unsigned_name(duo as $uD, div as $uD);
+            // (
+            //     ((tmp.0 as $iD) ^ quo_s).wrapping_sub(quo_s),
+            //     ((tmp.1 as $iD) ^ rem_s).wrapping_sub(rem_s),
+            // )
+
             match (duo < 0, div < 0) {
                 (false,false) => {
                     let t = $unsigned_name(duo as $uD,div as $uD);
