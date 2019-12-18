@@ -3,9 +3,11 @@
 This crate provides the algorithms, tests, and benchmarks for four different division functions:
 
 - The `_binary_long` functions for CPUs without hardware dividers
-- The `_delegate` functions for 
+- The `_delegate` functions similar to `_binary_long`, but with calls to smaller divisions if
+  possiblee
 - The `_trifecta` functions designed for dividing integers larger than the largest hardware division
-  a CPU supports
+  a CPU supports. These become efficient for 128 bit divisions, for both CPUs with and without
+  hardware dividers
 - The `_asymmetric` functions similar to the `_trifecta` functions, except optimized for CPUs with
   an asymmetric sized hardware division function such as x86_64's `divq`
 
