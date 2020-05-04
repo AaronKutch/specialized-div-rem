@@ -40,7 +40,7 @@ macro_rules! impl_delegate {
                 (true, true, _) => {
                     panic!("division by zero")
                 }
-                (_,false,true) => {
+                (_, false, true) => {
                     // `duo` < `div`
                     return (0, duo)
                 }
@@ -49,7 +49,7 @@ macro_rules! impl_delegate {
                     let tmp = $half_division(duo_lo, div_lo);
                     return (tmp.0 as $uD, tmp.1 as $uD)
                 }
-                (false,true,false) => {
+                (false, true, false) => {
                     if (div_lo >> $n_h) == 0 {
                         // Short division of $uD by a $uH, using $uX by $uX division
                         let div_0 = div_lo as $uH as $uX;
@@ -120,7 +120,7 @@ macro_rules! impl_delegate {
                         }
                     }
                 }
-                (_,false,false) => {
+                (_, false, false) => {
                     // Full $uD binary long division. Use `leading_zeros` on the first round,
                     // because we assume that the average usage of division has arguments that
                     // are random but have a significant number of leading zero bits. Doing
@@ -152,9 +152,13 @@ macro_rules! impl_delegate {
                             // the subtraction will not overflow
                             duo -= sub;
                             quo |= 1;
+                            let duo_hi = (duo >> n) as $uX;
+                            if duo_hi == 0 {
+                                return (quo << shift, duo)
+                            }
                         }
-                        let duo_hi = (duo >> n) as $uX;
-                        if duo_hi == 0 || shift == 0 {
+                        
+                        if shift == 0 {
                             return (quo << shift, duo)
                         }
                         shift -= 1;

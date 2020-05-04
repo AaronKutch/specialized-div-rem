@@ -2,16 +2,8 @@
 #![cfg_attr(feature = "asm", feature(llvm_asm))]
 extern crate test;
 use rand::prelude::*;
-use std::{
-    i128,
-    u128,
-    u32,
-    u64,
-};
-use test::{
-    black_box,
-    Bencher,
-};
+use std::{i128, u128, u32, u64};
+use test::{black_box, Bencher};
 
 extern crate specialized_div_rem;
 use specialized_div_rem::*;

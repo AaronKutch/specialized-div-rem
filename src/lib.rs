@@ -32,7 +32,7 @@ unsafe fn u128_by_u64_div_rem(duo: u128, div: u64) -> (u64, u64) {
         : "{rax}"(duo_lo), "{rdx}"(duo_hi), "r"(div)
         : "rax", "rdx"
     );
-return (quo, rem)
+    return (quo, rem);
 }
 
 // for when the $uD by $uX assembly function cannot be called

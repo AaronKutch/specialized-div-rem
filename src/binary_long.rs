@@ -60,13 +60,13 @@ macro_rules! impl_binary_long {
                 if (sub as $iX) >= 0 {
                     duo = sub;
                     quo |= 1;
+                    if duo == 0 {
+                        // must have this branch for inputs that are not as
+                        // random as what is used in the benchmarks
+                        return (quo << shift, duo)
+                    }
                 }
-
-                if duo == 0 {
-                    // must have this branch for inputs that are not as random as what is used in
-                    // the benchmarks
-                    return (quo << shift, duo)
-                }
+                
                 if shift == 0 {
                     return (quo, duo)
                 }
