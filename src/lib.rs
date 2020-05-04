@@ -1,5 +1,5 @@
 #![cfg_attr(feature = "no_std", no_std)]
-#![cfg_attr(feature = "asm", feature(asm))]
+#![cfg_attr(feature = "asm", feature(llvm_asm))]
 
 // it would be annoying to convert the test function in the macro to one
 // that could be used in a test module
@@ -27,11 +27,11 @@ unsafe fn u128_by_u64_div_rem(duo: u128, div: u64) -> (u64, u64) {
     let rem: u64;
     let duo_lo = duo as u64;
     let duo_hi = (duo >> 64) as u64;
-    asm!("divq $4"
-    : "={rax}"(quo), "={rdx}"(rem)
-    : "{rax}"(duo_lo), "{rdx}"(duo_hi), "r"(div)
-    : "rax", "rdx"
-);
+    llvm_asm!("divq $4"
+        : "={rax}"(quo), "={rdx}"(rem)
+        : "{rax}"(duo_lo), "{rdx}"(duo_hi), "r"(div)
+        : "rax", "rdx"
+    );
 return (quo, rem)
 }
 

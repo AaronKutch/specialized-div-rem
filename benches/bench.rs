@@ -1,5 +1,5 @@
 #![feature(test)]
-#![cfg_attr(feature = "asm", feature(asm))]
+#![cfg_attr(feature = "asm", feature(llvm_asm))]
 extern crate test;
 use rand::prelude::*;
 use std::{
