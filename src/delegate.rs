@@ -157,7 +157,7 @@ macro_rules! impl_delegate {
                                 return (quo << shift, duo)
                             }
                         }
-                        
+
                         if shift == 0 {
                             return (quo << shift, duo)
                         }

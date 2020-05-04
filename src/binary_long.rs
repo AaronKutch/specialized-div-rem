@@ -66,7 +66,7 @@ macro_rules! impl_binary_long {
                         return (quo << shift, duo)
                     }
                 }
-                
+
                 if shift == 0 {
                     return (quo, duo)
                 }
