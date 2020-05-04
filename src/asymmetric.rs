@@ -26,12 +26,12 @@ macro_rules! impl_asymmetric {
             #[$unsigned_attr]
         )*
         pub fn $unsigned_name(duo: $uD, div: $uD) -> ($uD,$uD) {
-            #[inline(always)]
+            #[inline]
             fn carrying_mul(lhs: $uX, rhs: $uX) -> ($uX, $uX) {
                 let tmp = (lhs as $uD).wrapping_mul(rhs as $uD);
                 (tmp as $uX, (tmp >> ($n_h * 2)) as $uX)
             }
-            #[inline(always)]
+            #[inline]
             fn carrying_mul_add(lhs: $uX, mul: $uX, add: $uX) -> ($uX, $uX) {
                 let tmp = (lhs as $uD).wrapping_mul(mul as $uD).wrapping_add(add as $uD);
                 (tmp as $uX, (tmp >> ($n_h * 2)) as $uX)
