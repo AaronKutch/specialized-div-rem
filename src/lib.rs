@@ -163,9 +163,10 @@ macro_rules! test {
 }
 
 // Note: one reason for the macros having a `$half_division:ident` instead of directly calling the
-// `/` and `%` builtin operators is that it makes benching what happens when the larger divisions
-// use different algorithms for their half division much easier. 
-// One result of this is that, when hardware division is not availiable and the u64 divisions
+// `/` and `%` builtin operators is that allows using different algorithms for the half
+// division instead of just the default.
+//
+// One result of benchmarking is that, when hardware division is not availiable and the u64 divisions
 // require a `u32_div_rem_binary_long` half sized division, the fastest algorithm is the
 // `u64_div_rem_delegate` algorithm. When the u128 sized divisions in turn use
 // `u64_div_rem_delegate` as their half sized division, the fastest algorithm is

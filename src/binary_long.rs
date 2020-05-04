@@ -11,7 +11,7 @@ macro_rules! impl_binary_long {
 
         /// Computes the quotient and remainder of `duo` divided by `div` and returns them as a
         /// tuple.
-        /// 
+        ///
         /// This uses binary shift long division only, and is designed for CPUs without fast
         /// multiplication or division hardware.
         ///
@@ -78,7 +78,7 @@ macro_rules! impl_binary_long {
 
         /// Computes the quotient and remainder of `duo` divided by `div` and returns them as a
         /// tuple.
-        /// 
+        ///
         /// This uses binary shift long division only, and is designed for CPUs without fast
         /// multiplication or division hardware.
         ///

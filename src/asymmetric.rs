@@ -14,7 +14,7 @@ macro_rules! impl_asymmetric {
     ) => {
         /// Computes the quotient and remainder of `duo` divided by `div` and returns them as a
         /// tuple.
-        /// 
+        ///
         /// This is optimized for dividing integers with the same bitwidth as the largest operand in
         /// an asymmetrically sized division. For example, the x86-64 `divq` assembly instruction
         /// can divide a 128 bit integer by a 64 bit integer if the quotient fits in 64 bits.
@@ -128,7 +128,7 @@ macro_rules! impl_asymmetric {
                 }
                 // Note that this is a large $uD multiplication being used here
                 let mut rem = duo - ((quo as $uD) * div);
-    
+
                 if rem >= div {
                     quo += 1;
                     rem -= div;
@@ -139,7 +139,7 @@ macro_rules! impl_asymmetric {
 
         /// Computes the quotient and remainder of `duo` divided by `div` and returns them as a
         /// tuple.
-        /// 
+        ///
         /// This is optimized for dividing integers with the same bitwidth as the largest operand in
         /// an asymmetrically sized division. For example, the x86-64 `divq` assembly instruction
         /// can divide a 128 bit integer by a 64 bit integer if the quotient fits in 64 bits.

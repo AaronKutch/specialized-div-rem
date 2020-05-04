@@ -13,17 +13,17 @@ macro_rules! impl_trifecta {
     ) => {
         /// Computes the quotient and remainder of `duo` divided by `div` and returns them as a
         /// tuple.
-        /// 
+        ///
         /// This is optimized for division of two integers with bit widths twice as large
         /// as the largest hardware integer division supported. Note that some architectures supply
         /// a division of an integer larger than register size by a regular sized integer (e.x.
         /// x86_64 has a `divq` instruction which can divide a 128 bit integer by a 64 bit integer).
         /// In that case, the `_asymmetric` algorithm should be used instead of this one.
-        /// 
+        ///
         /// This is called the trifecta algorithm because it uses three main algorithms: short
         /// division for small divisors, the "mul or mul - 1" algorithm for when the divisor is
         /// large enough for the quotient to be determined to be one of two values via only one
-        /// small division, and an underguessing long division algorithm for middle cases.
+        /// small division, and an undersubtracting long division algorithm for middle cases.
         ///
         /// # Panics
         ///
@@ -50,8 +50,10 @@ macro_rules! impl_trifecta {
 
             // the number of bits in a $uX
             let n = $n_h * 2;
-            // the number of bits in a $uD
-            let n_d = n * 2;
+
+            if div == 0 {
+                panic!("division by zero")
+            }
 
             // Note that throughout this function, `lo` and `hi` refer to the high and low `n` bits
             // of a `$uD`, `0` to `3` refer to the 4 `n_h` bit parts of a `$uD`,
@@ -59,11 +61,6 @@ macro_rules! impl_trifecta {
 
             let div_lz = div.leading_zeros();
             let mut duo_lz = duo.leading_zeros();
-
-            // division by zero branch
-            if div_lz == n_d {
-                panic!("division by zero")
-            }
 
             // the possible ranges of `duo` and `div` at this point:
             // `0 <= duo < 2^n_d`
@@ -93,10 +90,10 @@ macro_rules! impl_trifecta {
                     tmp.1 as $uD
                 )
             }
-            
+
             // relative leading significant bits, cannot overflow because of above branches
             let rel_leading_sb = div_lz.wrapping_sub(duo_lz);
-            
+
             // `{2^n, 2^div_sb} <= duo < 2^n_d`
             // `1 <= div < {2^duo_sb, 2^(n_d - 1)}`
             // short division branch
@@ -123,7 +120,7 @@ macro_rules! impl_trifecta {
                     rem_1 as $uD
                 )
             }
-            
+
             // `{2^n, 2^div_sb} <= duo < 2^n_d`
             // `2^n_h <= div < {2^duo_sb, 2^(n_d - 1)}`
             // `mul` or `mul - 1` branch
@@ -257,7 +254,7 @@ macro_rules! impl_trifecta {
                 }
             }
 
-            // Underguess long division algorithm.
+            // Undersubtracting long division algorithm.
             // Instead of clearing a minimum of 1 bit from `duo` per iteration via
             // binary long division, `n_h - 1` bits are cleared per iteration with this algorithm.
             // It is a more complicated version of regular long division. Most integer division
@@ -265,10 +262,13 @@ macro_rules! impl_trifecta {
             // the true quotient (which when multiplied by `div` will "oversubtract" the original
             // dividend). They then check if the quotient was in fact too large and then have to
             // correct it. This long division algorithm has been carefully constructed to always
-            // underguess the quotient by slim margins. The only problem is that it will not work
+            // underguess the quotient by slim margins. This allows different subalgorithms
+            // to be blindly jumped to without needing an extra correction step.
+            //
+            // The only problem is that this subalgorithm will not work
             // for many ranges of `duo` and `div`. Fortunately, the short division,
-            // mul or mul - 1 algorithms, and simple divisions happen to exactly fill these gaps.
-            // 
+            // mul or mul - 1 algorithm, and simple divisions happen to exactly fill these gaps.
+            //
             // For an example, consider the division of 76543210 by 213 and assume that `n_h`
             // is equal to two decimal digits (note: we are working with base 10 here for
             // readability).
@@ -397,13 +397,13 @@ macro_rules! impl_trifecta {
 
         /// Computes the quotient and remainder of `duo` divided by `div` and returns them as a
         /// tuple.
-        /// 
+        ///
         /// This is optimized for division of two integers with bit widths twice as large
         /// as the largest hardware integer division supported. Note that some architectures supply
         /// a division of an integer larger than register size by a regular sized integer (e.x.
         /// x86_64 has a `divq` instruction which can divide a 128 bit integer by a 64 bit integer).
         /// In that case, the `_asymmetric` algorithm should be used instead of this one.
-        /// 
+        ///
         /// This is called the trifecta algorithm because it uses three main algorithms: short
         /// division for small divisors, the "mul or mul - 1" algorithm for when the divisor is
         /// large enough for the quotient to be determined to be one of two values via only one

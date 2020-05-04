@@ -14,7 +14,7 @@ macro_rules! impl_delegate {
 
         /// Computes the quotient and remainder of `duo` divided by `div` and returns them as a
         /// tuple.
-        /// 
+        ///
         /// This uses binary shift long division, but if it can delegates work to a smaller
         /// division. This function is used for CPUs with a register size smaller than the division
         /// size, and that do not have fast multiplication or division hardware. For CPUs with a
@@ -167,7 +167,7 @@ macro_rules! impl_delegate {
 
         /// Computes the quotient and remainder of `duo` divided by `div` and returns them as a
         /// tuple.
-        /// 
+        ///
         /// This uses binary shift long division, but if it can delegates work to a smaller
         /// division. This function is used for CPUs with a register size smaller than the division
         /// size, and that do not have fast multiplication or division hardware. For CPUs with a
