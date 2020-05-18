@@ -91,7 +91,7 @@ macro_rules! test {
                                         lhs1.wrapping_div(rhs1),
                                         lhs1.wrapping_rem(rhs1)
                                     ) {
-                                    println!(
+                                    /*println!(
                                         "lhs:{} rhs:{} expected:({}, {}) found:({},{})",
                                         lhs1,
                                         rhs1,
@@ -99,7 +99,7 @@ macro_rules! test {
                                         lhs1.wrapping_rem(rhs1),
                                         $unsigned_name(lhs1,rhs1).0,
                                         $unsigned_name(lhs1,rhs1).1
-                                    );
+                                    );*/
                                     panic!();
                                 }
                                 if $signed_name(lhs1 as $iX,rhs1 as $iX) !=
@@ -107,7 +107,7 @@ macro_rules! test {
                                         (lhs1 as $iX).wrapping_div(rhs1 as $iX),
                                         (lhs1 as $iX).wrapping_rem(rhs1 as $iX)
                                     ) {
-                                    println!(
+                                    /*println!(
                                         "lhs:{} rhs:{} expected:({}, {}) found:({},{})",
                                         lhs1,
                                         rhs1,
@@ -115,7 +115,7 @@ macro_rules! test {
                                         lhs1.wrapping_rem(rhs1),
                                         $signed_name(lhs1 as $iX,rhs1 as $iX).0,
                                         $signed_name(lhs1 as $iX,rhs1 as $iX).1
-                                    );
+                                    );*/
                                     panic!();
                                 }
 
