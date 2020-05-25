@@ -1,25 +1,22 @@
 #![feature(test)]
-#![cfg_attr(feature = "asm", feature(llvm_asm))]
+
 extern crate test;
 use rand::prelude::*;
-use std::{i128, u128, u32, u64};
 use test::{black_box, Bencher};
 
 extern crate specialized_div_rem;
 use specialized_div_rem::*;
 
+// whatever Rust is using for the `/` and `%` operators
 pub fn u32_div_rem_std(duo: u32, div: u32) -> (u32, u32) {
     (duo / div, duo % div)
 }
-
 pub fn u64_div_rem_std(duo: u64, div: u64) -> (u64, u64) {
     (duo / div, duo % div)
 }
-
 pub fn u128_div_rem_std(duo: u128, div: u128) -> (u128, u128) {
     (duo / div, duo % div)
 }
-
 pub fn i128_div_rem_std(duo: i128, div: i128) -> (i128, i128) {
     (duo / div, duo % div)
 }

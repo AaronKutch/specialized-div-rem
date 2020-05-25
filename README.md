@@ -7,9 +7,10 @@ This crate provides the algorithms, tests, and benchmarks for four different div
   possiblee
 - The `_trifecta` functions designed for dividing integers larger than the largest hardware division
   a CPU supports. These become efficient for 128 bit divisions, for both CPUs with and without
-  hardware dividers
+  hardware dividers. Note that this function depends upon fast multpliers, such that `_delegate` can
+  outperform this function even with hardware dividers in some cases.
 - The `_asymmetric` functions similar to the `_trifecta` functions, except optimized for CPUs with
-  an asymmetric sized hardware division function such as x86_64's `divq`
+  an asymmetric sized hardware division function such as x86's `div` and x86_64's `divq`
 
 Note that setting the the `asm` feature flag can cause a significant performance improvement for
 these functions, and is absolutely required for `_asymmetric` to work efficiently.

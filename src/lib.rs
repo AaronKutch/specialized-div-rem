@@ -1,8 +1,6 @@
 #![cfg_attr(feature = "no_std", no_std)]
-#![cfg_attr(feature = "asm", feature(llvm_asm))]
+#![cfg_attr(feature = "asm", feature(asm))]
 
-// it would be annoying to convert the test function in the macro to one
-// that could be used in a test module
 #[cfg(test)]
 extern crate rand;
 
@@ -18,49 +16,84 @@ mod trifecta;
 #[macro_use]
 mod asymmetric;
 
-/// This function is unsafe, because if the quotient of `duo` and `div` does not
-/// fit in a `u64`, a floating point exception is thrown.
-#[cfg(all(target_arch = "x86_64", feature = "asm"))]
 #[inline]
-unsafe fn u128_by_u64_div_rem(duo: u128, div: u64) -> (u64, u64) {
-    let quo: u64;
-    let rem: u64;
-    let duo_lo = duo as u64;
-    let duo_hi = (duo >> 64) as u64;
-    llvm_asm!("divq $4"
-        : "={rax}"(quo), "={rdx}"(rem)
-        : "{rax}"(duo_lo), "{rdx}"(duo_hi), "r"(div)
-        : "rax", "rdx"
-    );
-    return (quo, rem);
+fn u16_by_u16_div_rem(duo: u16, div: u16) -> (u16, u16) {
+    (duo / div, duo % div)
 }
 
-// for when the $uD by $uX assembly function cannot be called
-#[cfg(any(not(target_arch = "x86_64"), not(feature = "asm")))]
-#[inline]
-unsafe fn u128_by_u64_div_rem(duo: u128, div: u64) -> (u64, u64) {
-    ((duo / (div as u128)) as u64, (duo % (div as u128)) as u64)
-}
-#[inline]
-unsafe fn u64_by_u32_div_rem(duo: u64, div: u32) -> (u32, u32) {
-    ((duo / (div as u64)) as u32, (duo % (div as u64)) as u32)
-}
 #[inline]
 unsafe fn u32_by_u16_div_rem(duo: u32, div: u16) -> (u16, u16) {
     ((duo / (div as u32)) as u16, (duo % (div as u32)) as u16)
 }
 
 #[inline]
-fn u16_by_u16_div_rem(duo: u16, div: u16) -> (u16, u16) {
-    (duo / div, duo % div)
-}
-#[inline]
 fn u32_by_u32_div_rem(duo: u32, div: u32) -> (u32, u32) {
     (duo / div, duo % div)
 }
+
+#[cfg(not(all(feature = "asm", target_arch = "x86")))]
+#[inline]
+unsafe fn u64_by_u32_div_rem(duo: u64, div: u32) -> (u32, u32) {
+    ((duo / (div as u64)) as u32, (duo % (div as u64)) as u32)
+}
+
+/// Divides `duo` by `div` and returns a tuple of the quotient and the remainder.
+///
+/// # Safety
+///
+/// If the quotient does not fit in a `u32`, or `div == 0`, a floating point exception happens.
+#[cfg(all(feature = "asm", target_arch = "x86"))]
+#[inline]
+unsafe fn u64_by_u32_div_rem(duo: u64, div: u32) -> (u32, u32) {
+    let duo_lo = duo as u32;
+    let duo_hi = (duo >> 32) as u32;
+    let quo: u32;
+    let rem: u32;
+    asm!(
+        // divides the combined registers rdx:rax (`duo` is split into two 32 bit parts to do this)
+        // by `div`. The quotient is stored in rax and the remainder in rdx.
+        "div {0}",
+        in(reg) div,
+        inlateout("rax") duo_lo => quo,
+        inlateout("rdx") duo_hi => rem,
+        options(pure, nomem, nostack)
+    );
+    (quo, rem)
+}
+
 #[inline]
 fn u64_by_u64_div_rem(duo: u64, div: u64) -> (u64, u64) {
     (duo / div, duo % div)
+}
+
+#[cfg(not(all(feature = "asm", target_arch = "x86_64")))]
+#[inline]
+unsafe fn u128_by_u64_div_rem(duo: u128, div: u64) -> (u64, u64) {
+    ((duo / (div as u128)) as u64, (duo % (div as u128)) as u64)
+}
+
+/// Divides `duo` by `div` and returns a tuple of the quotient and the remainder.
+///
+/// # Safety
+///
+/// If the quotient does not fit in a `u64`, or `div == 0`, a floating point exception happens.
+#[cfg(all(feature = "asm", target_arch = "x86_64"))]
+#[inline]
+unsafe fn u128_by_u64_div_rem(duo: u128, div: u64) -> (u64, u64) {
+    let duo_lo = duo as u64;
+    let duo_hi = (duo >> 64) as u64;
+    let quo: u64;
+    let rem: u64;
+    asm!(
+        // divides the combined registers rdx:rax (`duo` is split into two 64 bit parts to do this)
+        // by `div`. The quotient is stored in rax and the remainder in rdx.
+        "div {0}",
+        in(reg) div,
+        inlateout("rax") duo_lo => quo,
+        inlateout("rdx") duo_hi => rem,
+        options(pure, nomem, nostack)
+    );
+    (quo, rem)
 }
 
 macro_rules! test {
@@ -170,9 +203,10 @@ macro_rules! test {
 // require a `u32_div_rem_binary_long` half sized division, the fastest algorithm is the
 // `u64_div_rem_delegate` algorithm. When the u128 sized divisions in turn use
 // `u64_div_rem_delegate` as their half sized division, the fastest algorithm is
-// `u128_div_rem_trifecta`.
+// `u128_div_rem_trifecta` (except if the hardware does not have a fast enough multiplier, in which
+// case `u128_div_rem_delegate` should be used).
 
-// for completeness of smaller divisions for small CPUs
+// 8 bit
 impl_binary_long!(
     u8_div_rem_binary_long,
     i8_div_rem_binary_long,
@@ -190,6 +224,8 @@ test!(
     u8_div_rem_binary_long,
     i8_div_rem_binary_long
 );
+
+// 16 bit
 impl_binary_long!(
     u16_div_rem_binary_long,
     i16_div_rem_binary_long,
@@ -208,6 +244,7 @@ test!(
     i16_div_rem_binary_long
 );
 
+// 32 bit
 impl_binary_long!(
     u32_div_rem_binary_long,
     i32_div_rem_binary_long,
@@ -272,6 +309,7 @@ test!(
     i32_div_rem_asymmetric
 );
 
+// 64 bit
 impl_binary_long!(
     u64_div_rem_binary_long,
     i64_div_rem_binary_long,
@@ -336,6 +374,7 @@ test!(
     i64_div_rem_asymmetric
 );
 
+// 128 bit
 impl_binary_long!(
     u128_div_rem_binary_long,
     i128_div_rem_binary_long,
