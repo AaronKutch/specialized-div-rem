@@ -13,6 +13,8 @@ categories = ["algorithms", "no-std"]
 license = "MIT OR Apache-2.0"
 
 [features]
+# assembly is so critical to the performance of some algorithms that it should be the default
+default = ["asm"]
 no_std = []
 asm = []
 
