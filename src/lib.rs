@@ -31,7 +31,7 @@ fn u32_by_u32_div_rem(duo: u32, div: u32) -> (u32, u32) {
     (duo / div, duo % div)
 }
 
-#[cfg(not(all(feature = "asm", target_arch = "x86")))]
+#[cfg(any(not(feature = "asm"), not(target_arch = "x86")))]
 #[inline]
 unsafe fn u64_by_u32_div_rem(duo: u64, div: u32) -> (u32, u32) {
     ((duo / (div as u64)) as u32, (duo % (div as u64)) as u32)
@@ -66,7 +66,7 @@ fn u64_by_u64_div_rem(duo: u64, div: u64) -> (u64, u64) {
     (duo / div, duo % div)
 }
 
-#[cfg(not(all(feature = "asm", target_arch = "x86_64")))]
+#[cfg(any(not(feature = "asm"), not(target_arch = "x86_64")))]
 #[inline]
 unsafe fn u128_by_u64_div_rem(duo: u128, div: u64) -> (u64, u64) {
     ((duo / (div as u128)) as u64, (duo % (div as u128)) as u64)
