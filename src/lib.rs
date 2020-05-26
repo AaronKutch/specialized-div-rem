@@ -266,18 +266,6 @@ impl_delegate!(
     inline;
     inline
 );
-impl_trifecta!(
-    u32_div_rem_trifecta,
-    i32_div_rem_trifecta,
-    u16_by_u16_div_rem,
-    8,
-    u8,
-    u16,
-    u32,
-    i32,
-    inline;
-    inline
-);
 impl_asymmetric!(
     u32_div_rem_asymmetric,
     i32_div_rem_asymmetric,
@@ -301,9 +289,6 @@ test!(
     div_rem_delegate_32,
     u32_div_rem_delegate,
     i32_div_rem_delegate;
-    div_rem_trifecta_32,
-    u32_div_rem_trifecta,
-    i32_div_rem_trifecta;
     div_rem_asymmetric_32,
     u32_div_rem_asymmetric,
     i32_div_rem_asymmetric
@@ -375,15 +360,6 @@ test!(
 );
 
 // 128 bit
-impl_binary_long!(
-    u128_div_rem_binary_long,
-    i128_div_rem_binary_long,
-    128,
-    u128,
-    i128,
-    inline;
-    inline
-);
 impl_delegate!(
     u128_div_rem_delegate,
     i128_div_rem_delegate,
@@ -425,9 +401,6 @@ test!(
     128,
     u128,
     i128,
-    div_rem_binary_long_128,
-    u128_div_rem_binary_long,
-    i128_div_rem_binary_long;
     div_rem_delegate_128,
     u128_div_rem_delegate,
     i128_div_rem_delegate;
