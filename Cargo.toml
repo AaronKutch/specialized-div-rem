@@ -18,5 +18,5 @@ default = ["asm"]
 no_std = []
 asm = []
 
-[dev-dependencies] # for benchmarks
+[dev-dependencies] # for random numbers in benchmarks
 rand = "0.7"

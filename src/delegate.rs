@@ -1,33 +1,30 @@
 macro_rules! impl_delegate {
     (
-        $unsigned_name:ident, // name of the unsigned function
-        $signed_name:ident, // name of the signed function
+        $unsigned_name:ident, // name of the unsigned division function
+        $signed_name:ident, // name of the signed division function
         $half_division:ident, // function for division of a $uX by a $uX
         $n_h:expr, // the number of bits in $iH or $uH
         $uH:ident, // unsigned integer with half the bit width of $uX
-        $uX:ident, // unsigned integer with half the bit width of $uD
-        $uD:ident, // unsigned integer with double the bit width of $uX
-        $iD:ident, // signed version of $uD
+        $uX:ident, // unsigned integer with half the bit width of $uD. 
+        $uD:ident, // unsigned integer type for the inputs and outputs of `$unsigned_name`
+        $iD:ident, // signed integer type for the inputs and outputs of `$signed_name`
         $($unsigned_attr:meta),*; // attributes for the unsigned function
         $($signed_attr:meta),* // attributes for the signed function
     ) => {
-
         /// Computes the quotient and remainder of `duo` divided by `div` and returns them as a
         /// tuple.
-        ///
-        /// This uses binary shift long division, but if it can delegates work to a smaller
-        /// division. This function is used for CPUs with a register size smaller than the division
-        /// size, and that do not have fast multiplication or division hardware. For CPUs with a
-        /// register size equal to the division size, the `_binary_long` functions are probably
-        /// faster.
-        ///
+        /// 
+        /// This uses binary long division, but if it can delegates work to a smaller division. This
+        /// function is intended for divisions of integers larger than the register size on CPUs
+        /// that do not have fast multiplication or division hardware.
+        /// 
         /// # Panics
-        ///
+        /// 
         /// When attempting to divide by zero, this function will panic.
         $(
             #[$unsigned_attr]
         )*
-        pub fn $unsigned_name(duo: $uD, div: $uD) -> ($uD,$uD) {
+        pub fn $unsigned_name(duo: $uD, div: $uD) -> ($uD, $uD) {
             // the number of bits in a $uX
             let n = $n_h * 2;
 
@@ -171,36 +168,34 @@ macro_rules! impl_delegate {
 
         /// Computes the quotient and remainder of `duo` divided by `div` and returns them as a
         /// tuple.
-        ///
-        /// This uses binary shift long division, but if it can delegates work to a smaller
-        /// division. This function is used for CPUs with a register size smaller than the division
-        /// size, and that do not have fast multiplication or division hardware. For CPUs with a
-        /// register size equal to the division size, the `_binary_long` functions are probably
-        /// faster.
-        ///
+        /// 
+        /// This uses binary long division, but if it can delegates work to a smaller division. This
+        /// function is intended for divisions of integers larger than the register size on CPUs
+        /// that do not have fast multiplication or division hardware.
+        /// 
         /// # Panics
-        ///
+        /// 
         /// When attempting to divide by zero, this function will panic.
         $(
             #[$signed_attr]
         )*
-        pub fn $signed_name(duo: $iD, div: $iD) -> ($iD,$iD) {
+        pub fn $signed_name(duo: $iD, div: $iD) -> ($iD, $iD) {
             match (duo < 0, div < 0) {
-                (false,false) => {
-                    let t = $unsigned_name(duo as $uD,div as $uD);
-                    (t.0 as $iD,t.1 as $iD)
+                (false, false) => {
+                    let t = $unsigned_name(duo as $uD, div as $uD);
+                    (t.0 as $iD, t.1 as $iD)
                 },
-                (true,false) => {
-                    let t = $unsigned_name(duo.wrapping_neg() as $uD,div as $uD);
-                    ((t.0 as $iD).wrapping_neg(),(t.1 as $iD).wrapping_neg())
+                (true, false) => {
+                    let t = $unsigned_name(duo.wrapping_neg() as $uD, div as $uD);
+                    ((t.0 as $iD).wrapping_neg(), (t.1 as $iD).wrapping_neg())
                 },
-                (false,true) => {
-                    let t = $unsigned_name(duo as $uD,div.wrapping_neg() as $uD);
-                    ((t.0 as $iD).wrapping_neg(),t.1 as $iD)
+                (false, true) => {
+                    let t = $unsigned_name(duo as $uD, div.wrapping_neg() as $uD);
+                    ((t.0 as $iD).wrapping_neg(), t.1 as $iD)
                 },
-                (true,true) => {
-                    let t = $unsigned_name(duo.wrapping_neg() as $uD,div.wrapping_neg() as $uD);
-                    (t.0 as $iD,(t.1 as $iD).wrapping_neg())
+                (true, true) => {
+                    let t = $unsigned_name(duo.wrapping_neg() as $uD, div.wrapping_neg() as $uD);
+                    (t.0 as $iD, (t.1 as $iD).wrapping_neg())
                 },
             }
         }

@@ -1,14 +1,14 @@
 macro_rules! impl_asymmetric {
     (
-        $unsigned_name:ident, // name of the unsigned function
-        $signed_name:ident, // name of the signed function
+        $unsigned_name:ident, // name of the unsigned division function
+        $signed_name:ident, // name of the signed division function
         $half_division:ident, // function for division of a $uX by a $uX
         $asymmetric_division:ident, // function for division of a $uD by a $uX
-        $n_h:expr, // the number of bits in $iH or $uH
+        $n_h:expr, // the number of bits in a $iH or $uH
         $uH:ident, // unsigned integer with half the bit width of $uX
         $uX:ident, // unsigned integer with half the bit width of $uD
-        $uD:ident, // unsigned integer with double the bit width of $uX
-        $iD:ident, // signed version of $uD
+        $uD:ident, // unsigned integer type for the inputs and outputs of `$unsigned_name`
+        $iD:ident, // signed integer type for the inputs and outputs of `$signed_name`
         $($unsigned_attr:meta),*; // attributes for the unsigned function
         $($signed_attr:meta),* // attributes for the signed function
     ) => {
@@ -16,8 +16,10 @@ macro_rules! impl_asymmetric {
         /// tuple.
         ///
         /// This is optimized for dividing integers with the same bitwidth as the largest operand in
-        /// an asymmetrically sized division. For example, the x86-64 `divq` assembly instruction
-        /// can divide a 128 bit integer by a 64 bit integer if the quotient fits in 64 bits.
+        /// an asymmetrically sized division. For example, x86-64 has an assembly instruction that
+        /// can divide a 128 bit integer by a 64 bit integer if the quotient fits in 64 bits. The
+        /// 128 bit version of this algorithm would use that fast hardware division to construct a
+        /// full 128 bit by 128 bit division.
         ///
         /// # Panics
         ///
@@ -89,8 +91,9 @@ macro_rules! impl_asymmetric {
             let div_lz = div_hi.leading_zeros();
             let rel_leading_sb = div_lz.wrapping_sub(duo_lz);
             if rel_leading_sb < $n_h {
-                // Some x86_64 CPUs have bad `divq` implementations that make putting
-                // a `mul` or `mul - 1` algorithm here beneficial
+                // Some x86_64 CPUs have bad hardware division implementations that make putting
+                // a `mul` or `mul - 1` algorithm here beneficial. See `trifecta.rs` for how this
+                // works.
                 let shift = n.wrapping_sub(duo_lz);
                 let duo_sig_n = (duo >> shift) as $uX;
                 let div_sig_n = (div >> shift) as $uX;
@@ -114,7 +117,8 @@ macro_rules! impl_asymmetric {
             } else {
                 // This has been adapted from
                 // https://www.codeproject.com/tips/785014/uint-division-modulus which was in turn
-                // adapted from www.hackersdelight.org
+                // adapted from www.hackersdelight.org (which, as of writing, unfortunately seems to
+                // no longer exist).
 
                 // This is similar to the `mul` or `mul - 1` algorithm in that it uses only more
                 // significant parts of `duo` and `div` to divide a large integer with a smaller
@@ -141,8 +145,10 @@ macro_rules! impl_asymmetric {
         /// tuple.
         ///
         /// This is optimized for dividing integers with the same bitwidth as the largest operand in
-        /// an asymmetrically sized division. For example, the x86-64 `divq` assembly instruction
-        /// can divide a 128 bit integer by a 64 bit integer if the quotient fits in 64 bits.
+        /// an asymmetrically sized division. For example, x86-64 has an assembly instruction that
+        /// can divide a 128 bit integer by a 64 bit integer if the quotient fits in 64 bits. The
+        /// 128 bit version of this algorithm would use that fast hardware division to construct a
+        /// full 128 bit by 128 bit division.
         ///
         /// # Panics
         ///
@@ -150,23 +156,23 @@ macro_rules! impl_asymmetric {
         $(
             #[$signed_attr]
         )*
-        pub fn $signed_name(duo: $iD, div: $iD) -> ($iD,$iD) {
+        pub fn $signed_name(duo: $iD, div: $iD) -> ($iD, $iD) {
             match (duo < 0, div < 0) {
-                (false,false) => {
-                    let t = $unsigned_name(duo as $uD,div as $uD);
-                    (t.0 as $iD,t.1 as $iD)
+                (false, false) => {
+                    let t = $unsigned_name(duo as $uD, div as $uD);
+                    (t.0 as $iD, t.1 as $iD)
                 },
-                (true,false) => {
-                    let t = $unsigned_name(duo.wrapping_neg() as $uD,div as $uD);
-                    ((t.0 as $iD).wrapping_neg(),(t.1 as $iD).wrapping_neg())
+                (true, false) => {
+                    let t = $unsigned_name(duo.wrapping_neg() as $uD, div as $uD);
+                    ((t.0 as $iD).wrapping_neg(), (t.1 as $iD).wrapping_neg())
                 },
-                (false,true) => {
-                    let t = $unsigned_name(duo as $uD,div.wrapping_neg() as $uD);
-                    ((t.0 as $iD).wrapping_neg(),t.1 as $iD)
+                (false, true) => {
+                    let t = $unsigned_name(duo as $uD, div.wrapping_neg() as $uD);
+                    ((t.0 as $iD).wrapping_neg(), t.1 as $iD)
                 },
-                (true,true) => {
-                    let t = $unsigned_name(duo.wrapping_neg() as $uD,div.wrapping_neg() as $uD);
-                    (t.0 as $iD,(t.1 as $iD).wrapping_neg())
+                (true, true) => {
+                    let t = $unsigned_name(duo.wrapping_neg() as $uD, div.wrapping_neg() as $uD);
+                    (t.0 as $iD, (t.1 as $iD).wrapping_neg())
                 },
             }
         }

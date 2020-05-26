@@ -1,13 +1,13 @@
 macro_rules! impl_trifecta {
     (
-        $unsigned_name:ident, // name of the unsigned function
-        $signed_name:ident, // name of the signed function
+        $unsigned_name:ident, // name of the unsigned division function
+        $signed_name:ident, // name of the signed division function
         $half_division:ident, // function for division of a $uX by a $uX
         $n_h:expr, // the number of bits in $iH or $uH
         $uH:ident, // unsigned integer with half the bit width of $uX
-        $uX:ident, // the largest division instruction that this function calls operates on this
-        $uD:ident, // unsigned integer with double the bit width of $uX
-        $iD:ident, // signed version of $uD
+        $uX:ident, // unsigned integer with half the bit width of $uD
+        $uD:ident, // unsigned integer type for the inputs and outputs of `$unsigned_name`
+        $iD:ident, // signed integer type for the inputs and outputs of `$signed_name`
         $($unsigned_attr:meta),*; // attributes for the unsigned function
         $($signed_attr:meta),* // attributes for the signed function
     ) => {
@@ -17,8 +17,13 @@ macro_rules! impl_trifecta {
         /// This is optimized for division of two integers with bit widths twice as large
         /// as the largest hardware integer division supported. Note that some architectures supply
         /// a division of an integer larger than register size by a regular sized integer (e.x.
-        /// x86_64 has a `divq` instruction which can divide a 128 bit integer by a 64 bit integer).
-        /// In that case, the `_asymmetric` algorithm should be used instead of this one.
+        /// x86_64 has an assembly instruction which can divide a 128 bit integer by a 64 bit
+        /// integer). In that case, the `_asymmetric` algorithm should be used instead of this one.
+        ///
+        /// Note that sometimes, CPUs can have hardware division, but it is emulated in a way that
+        /// is not significantly faster than custom binary long division, and/or the hardware
+        /// multiplier is so slow that the alternative `_delegate` algorithm is faster. `_trifecta`
+        /// depends on both the divider and multplier being fast.
         ///
         /// This is called the trifecta algorithm because it uses three main algorithms: short
         /// division for small divisors, the "mul or mul - 1" algorithm for when the divisor is
@@ -31,7 +36,7 @@ macro_rules! impl_trifecta {
         $(
             #[$unsigned_attr]
         )*
-        pub fn $unsigned_name(duo: $uD, div: $uD) -> ($uD,$uD) {
+        pub fn $unsigned_name(duo: $uD, div: $uD) -> ($uD, $uD) {
             // wrapping_{} was used everywhere for better performance when compiling with
             // `debug-assertions = true`
 
@@ -401,13 +406,18 @@ macro_rules! impl_trifecta {
         /// This is optimized for division of two integers with bit widths twice as large
         /// as the largest hardware integer division supported. Note that some architectures supply
         /// a division of an integer larger than register size by a regular sized integer (e.x.
-        /// x86_64 has a `divq` instruction which can divide a 128 bit integer by a 64 bit integer).
-        /// In that case, the `_asymmetric` algorithm should be used instead of this one.
+        /// x86_64 has an assembly instruction which can divide a 128 bit integer by a 64 bit
+        /// integer). In that case, the `_asymmetric` algorithm should be used instead of this one.
+        ///
+        /// Note that sometimes, CPUs can have hardware division, but it is emulated in a way that
+        /// is not significantly faster than custom binary long division, and/or the hardware
+        /// multiplier is so slow that the alternative `_delegate` algorithm is faster. `_trifecta`
+        /// depends on both the divider and multplier being fast.
         ///
         /// This is called the trifecta algorithm because it uses three main algorithms: short
         /// division for small divisors, the "mul or mul - 1" algorithm for when the divisor is
         /// large enough for the quotient to be determined to be one of two values via only one
-        /// small division, and an underguessing long division algorithm for middle cases.
+        /// small division, and an undersubtracting long division algorithm for middle cases.
         ///
         /// # Panics
         ///
@@ -415,38 +425,23 @@ macro_rules! impl_trifecta {
         $(
             #[$signed_attr]
         )*
-        pub fn $signed_name(duo: $iD, div: $iD) -> ($iD,$iD) {
-            // Note: there is a way of doing this without any branches, but it is unfortunately
-            // significantly slower
-            // let n_d = $n_h * 4;
-            // let duo_s = duo >> (n_d - 1);
-            // let div_s = div >> (n_d - 1);
-            // let duo = (duo ^ duo_s).wrapping_sub(duo_s);
-            // let div = (div ^ div_s).wrapping_sub(div_s);
-            // let quo_s = duo_s ^ div_s;
-            // let rem_s = duo_s;
-            // let tmp = $unsigned_name(duo as $uD, div as $uD);
-            // (
-            //     ((tmp.0 as $iD) ^ quo_s).wrapping_sub(quo_s),
-            //     ((tmp.1 as $iD) ^ rem_s).wrapping_sub(rem_s),
-            // )
-
+        pub fn $signed_name(duo: $iD, div: $iD) -> ($iD, $iD) {
             match (duo < 0, div < 0) {
-                (false,false) => {
-                    let t = $unsigned_name(duo as $uD,div as $uD);
-                    (t.0 as $iD,t.1 as $iD)
+                (false, false) => {
+                    let t = $unsigned_name(duo as $uD, div as $uD);
+                    (t.0 as $iD, t.1 as $iD)
                 },
-                (true,false) => {
-                    let t = $unsigned_name(duo.wrapping_neg() as $uD,div as $uD);
-                    ((t.0 as $iD).wrapping_neg(),(t.1 as $iD).wrapping_neg())
+                (true, false) => {
+                    let t = $unsigned_name(duo.wrapping_neg() as $uD, div as $uD);
+                    ((t.0 as $iD).wrapping_neg(), (t.1 as $iD).wrapping_neg())
                 },
-                (false,true) => {
-                    let t = $unsigned_name(duo as $uD,div.wrapping_neg() as $uD);
-                    ((t.0 as $iD).wrapping_neg(),t.1 as $iD)
+                (false, true) => {
+                    let t = $unsigned_name(duo as $uD, div.wrapping_neg() as $uD);
+                    ((t.0 as $iD).wrapping_neg(), t.1 as $iD)
                 },
-                (true,true) => {
-                    let t = $unsigned_name(duo.wrapping_neg() as $uD,div.wrapping_neg() as $uD);
-                    (t.0 as $iD,(t.1 as $iD).wrapping_neg())
+                (true, true) => {
+                    let t = $unsigned_name(duo.wrapping_neg() as $uD, div.wrapping_neg() as $uD);
+                    (t.0 as $iD, (t.1 as $iD).wrapping_neg())
                 },
             }
         }
