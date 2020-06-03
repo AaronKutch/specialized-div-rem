@@ -1,11 +1,20 @@
-#![cfg_attr(feature = "no_std", no_std)]
+// NOTE: ranges (like `0..=x`) should not be used in the algorithms of this library, since they can
+// generate references to `memcpy` in unoptimized code. this code is intended to be used by
+// `compiler-builtins` which cannot use `memcpy`.
+
+#![cfg_attr(not(feature = "std"), no_std)]
 #![cfg_attr(feature = "asm", feature(asm))]
 
 #[cfg(test)]
 extern crate rand;
+#[cfg(test)]
+use rand::random;
 
 #[macro_use]
 mod binary_long;
+
+#[macro_use]
+mod carry_left;
 
 #[macro_use]
 mod delegate;
@@ -108,7 +117,6 @@ macro_rules! test {
         $(
             #[test]
             fn $test_name() {
-                use rand::random;
                 // checks all possible single continuous strings of ones (except when all bits
                 // are zero) uses about 68 million iterations for T = u128
                 let mut lhs0: $uX = 1;
@@ -124,7 +132,7 @@ macro_rules! test {
                                         lhs1.wrapping_div(rhs1),
                                         lhs1.wrapping_rem(rhs1)
                                     ) {
-                                    /*println!(
+                                    println!(
                                         "lhs:{} rhs:{} expected:({}, {}) found:({},{})",
                                         lhs1,
                                         rhs1,
@@ -132,15 +140,15 @@ macro_rules! test {
                                         lhs1.wrapping_rem(rhs1),
                                         $unsigned_name(lhs1,rhs1).0,
                                         $unsigned_name(lhs1,rhs1).1
-                                    );*/
-                                    panic!();
+                                    );
+                                    panic!("failed division test");
                                 }
                                 if $signed_name(lhs1 as $iX,rhs1 as $iX) !=
                                     (
                                         (lhs1 as $iX).wrapping_div(rhs1 as $iX),
                                         (lhs1 as $iX).wrapping_rem(rhs1 as $iX)
                                     ) {
-                                    /*println!(
+                                    println!(
                                         "lhs:{} rhs:{} expected:({}, {}) found:({},{})",
                                         lhs1,
                                         rhs1,
@@ -148,8 +156,8 @@ macro_rules! test {
                                         lhs1.wrapping_rem(rhs1),
                                         $signed_name(lhs1 as $iX,rhs1 as $iX).0,
                                         $signed_name(lhs1 as $iX,rhs1 as $iX).1
-                                    );*/
-                                    panic!();
+                                    );
+                                    panic!("failed division test");
                                 }
 
                                 rhs1 ^= 1 << i3;
