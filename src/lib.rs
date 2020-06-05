@@ -2,6 +2,9 @@
 // generate references to `memcpy` in unoptimized code. this code is intended to be used by
 // `compiler-builtins` which cannot use `memcpy`.
 
+#![feature(unsafe_block_in_unsafe_fn )]
+#![deny(unsafe_op_in_unsafe_fn)]
+
 #![cfg_attr(not(feature = "std"), no_std)]
 #![cfg_attr(feature = "asm", feature(asm))]
 
@@ -242,15 +245,17 @@ unsafe fn u64_by_u32_div_rem(duo: u64, div: u32) -> (u32, u32) {
     let duo_hi = (duo >> 32) as u32;
     let quo: u32;
     let rem: u32;
-    asm!(
+    unsafe {
         // divides the combined registers rdx:rax (`duo` is split into two 32 bit parts to do this)
         // by `div`. The quotient is stored in rax and the remainder in rdx.
-        "div {0}",
-        in(reg) div,
-        inlateout("rax") duo_lo => quo,
-        inlateout("rdx") duo_hi => rem,
-        options(pure, nomem, nostack)
-    );
+        asm!(
+            "div {0}",
+            in(reg) div,
+            inlateout("rax") duo_lo => quo,
+            inlateout("rdx") duo_hi => rem,
+            options(pure, nomem, nostack)
+        );
+    }
     (quo, rem)
 }
 
@@ -277,15 +282,17 @@ unsafe fn u128_by_u64_div_rem(duo: u128, div: u64) -> (u64, u64) {
     let duo_hi = (duo >> 64) as u64;
     let quo: u64;
     let rem: u64;
-    asm!(
+    unsafe {
         // divides the combined registers rdx:rax (`duo` is split into two 64 bit parts to do this)
         // by `div`. The quotient is stored in rax and the remainder in rdx.
-        "div {0}",
-        in(reg) div,
-        inlateout("rax") duo_lo => quo,
-        inlateout("rdx") duo_hi => rem,
-        options(pure, nomem, nostack)
-    );
+        asm!(
+            "div {0}",
+            in(reg) div,
+            inlateout("rax") duo_lo => quo,
+            inlateout("rdx") duo_hi => rem,
+            options(pure, nomem, nostack)
+        );
+    }
     (quo, rem)
 }
 
