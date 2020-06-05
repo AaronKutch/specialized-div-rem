@@ -174,6 +174,16 @@ pub const fn leading_zeros(x: usize) -> usize {
 }
 
 #[test]
+fn lkj() {
+    println!("binary_long");
+    let duo = 255;
+    let div = 3;
+    u8_div_rem_binary_long(duo, div);
+    println!("carry_left");
+    panic!("{:?}", u8_div_rem_carry_left(duo, div));
+}
+
+#[test]
 fn leading_zeros_test() {
     // binary fuzzer
     let mut x = 0usize;
@@ -398,13 +408,25 @@ impl_binary_long!(
     inline;
     inline
 );
+impl_carry_left!(
+    u8_div_rem_carry_left,
+    i8_div_rem_carry_left,
+    8,
+    u8,
+    i8,
+    inline;
+    inline
+);
 test!(
     8,
     u8,
     i8,
     div_rem_binary_long_8,
     u8_div_rem_binary_long,
-    i8_div_rem_binary_long
+    i8_div_rem_binary_long;
+    div_rem_carry_left_8,
+    u8_div_rem_carry_left,
+    i8_div_rem_carry_left
 );
 
 // 16 bit

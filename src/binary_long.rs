@@ -30,9 +30,8 @@ macro_rules! impl_binary_long {
             if duo < div {
                 return (0, duo)
             }
-            // This eliminates cases where the most significant bits of `duo` or `div` are set.
-            // Signed comparisons can then be used to determine overflow without needing carry
-            // flags.
+            // This eliminates cases where the most significant bit of `div` is set. Signed
+            // comparisons can then be used to determine overflow without needing carry flags.
             if (duo - div) < div {
                 return (1, duo - div)
             }
@@ -112,12 +111,12 @@ macro_rules! impl_binary_long {
                     //             - __________
                     //          sub: 0b00000000
                     // the problem with this is that `duo >> shift` is shifting off a set bit
-                    // that makes `duo >= 2*(div << shift)`, which would break the binary
-                    // division step below, but this cannot happen with `sub < 0`.
+                    // that makes `duo >= 2*(div << shift)`, which would break binary division steps
+                    // assuming normalization, but this cannot happen with `sub < 0`.
                     //
-                    // Otherwise, it involves cases where `sub >= div` when the most significant
-                    // bits are aligned. We know that the current shift is the smaller shift in
-                    // the cycle and can automatically be part of a long division step.
+                    // If `(sub as $iX) >= 0`, it involves cases where `sub >= div` when the most
+                    // significant bits are aligned. We know that the current shift is the smaller
+                    // shift in the cycle and can automatically be part of a long division step.
                     if (sub as $iX) < 0 {
                         shift -= 1;
                         break
@@ -130,7 +129,11 @@ macro_rules! impl_binary_long {
             }
             
             // There are many variations of binary division algorithm that could be used. This
-            // documentation explains why the final variation is what is chosen. You may notice that
+            // documentation gives a tour of different methods so that future readers wanting to
+            // optimize further do not have to painstakingly derive them. The SWAR variation is
+            // especially hard to understand without reading the less convoluted methods first.
+
+            // You may notice that
             // a `duo < div_original` check is included in all these algorithms. A critical
             // optimization that many algorithms I see online miss is handling of quotients that
             // will turn out to have many trailing zeros or many leading zeros. This happens in
@@ -180,8 +183,10 @@ macro_rules! impl_binary_long {
             //     - __________
             // sub = 0b00000100
             // quo = 0b00011101
-            // now `shift == 0` so `quo` is now the correct quotient of 29 and `duo` is the
-            // remainder
+            //
+            // duo = 0b00000100
+            // now `shift == 0` so `quo` is now the correct quotient of 29u8 and `duo` is the
+            // remainder 4u8
             /*
             let mut div = div << shift;
             let mut quo = 0;
@@ -219,7 +224,7 @@ macro_rules! impl_binary_long {
 
             // Perform one binary long division step on the already normalized arguments, and setup
             // all the variables.
-            let div_original = div;
+            /*let div_original = div;
             let mut div: $uX = (div << shift);
             let mut pow: $uX = 1 << shift;
             let mut quo: $uX = pow;
@@ -240,48 +245,10 @@ macro_rules! impl_binary_long {
                 }
                 pow >>= 1;
                 div >>= 1;
-            }
-
-            // Another kind of long division uses an interesting fact that `div` and `pow` can be
-            // negated when `duo` is negative to perform a "negated" division step that works in
-            // place of any normalization mechanism. Unfortunately, it requires about the same
-            // number of instructions for one step as the other division algorithm. This is kept
-            // here in case it is useful for some case.
-            /*
-            // note that the two most significant bits of `duo` must be cleared and the arguments
-            // normalized before reaching this point.
-            let div_original = div;
-            let mut div: $uX = (div << shift);
-            let mut pow: $uX = 1 << shift;
-            let mut quo: $uX = pow;
-            duo = duo.wrapping_sub(div);
-            if duo < div_original {
-                return (quo, duo);
-            }
-            div >>= 1;
-            pow >>= 1;
-            loop {
-                if duo < 0 {
-                    // Negated binary long division step.
-                    duo = duo.wrapping_add(div);
-                    quo = quo.wrapping_sub(pow);
-                    pow >>= 1;
-                    div >>= 1;
-                } else {
-                    // Regular long division step.
-                    if duo < div_original {
-                        return (quo, duo)
-                    }
-                    duo = duo.wrapping_sub(div);
-                    quo = quo.wrapping_add(pow);
-                    pow >>= 1;
-                    div >>= 1;
-                }
-            }
-            */
-
-            // Finally, there is a way to do binary long division without branching or predication,
-            // but it requires about 4 extra operations (smearing the sign bit, negating the mask,
+            }*/
+            
+            // There is a way to do binary long division without branching or predication, but it
+            // requires about 4 extra operations (smearing the sign bit, negating the mask, and
             // applying the mask twice):
             //
             // let sub = duo.wrapping_sub(div);
@@ -294,6 +261,51 @@ macro_rules! impl_binary_long {
             // needed to break even (assuming that a branch miss occurs on half of steps). Branches
             // would still need to be inserted at regular intervals to make sure exact divisions are
             // fast.
+
+            // Another kind of long division uses an interesting fact that `div` and `pow` can be
+            // negated when `duo` is negative to perform a "negated" division step that works in
+            // place of any normalization mechanism. It is very similar to the non-restoring
+            // division algorithms that can be found on the internet, except there is only one test
+            // for `duo < 0`. Unfortunately, it requires about the same number of instructions for
+            // one step as the division algorithm above.
+            
+            let div_original = div;
+            let mut div: $uX = (div << shift);
+            let mut pow: $uX = 1 << shift;
+            let mut quo: $uX = pow;
+            dbg!("start", duo, quo, pow, div);
+            println!("duo:{:08b}, quo:{:08b}, pow:{:08b}, div:{:08b}", duo, quo, pow, div);
+
+            duo = duo.wrapping_sub(div);
+            if duo < div_original {
+                return (quo, duo);
+            }
+            div >>= 1;
+            pow >>= 1;
+            println!("duo:{:08b}, quo:{:08b}, pow:{:08b}, div:{:08b}", duo, quo, pow, div);
+            loop {
+                //dbg!(duo, quo, pow, div);
+                if (duo as $iX) < 0 {
+                    // Negated binary long division step.
+                    duo = duo.wrapping_add(div);
+                    quo = quo.wrapping_sub(pow);
+                    pow >>= 1;
+                    div >>= 1;
+                } else {
+                    // Regular long division step.
+                    if duo < div_original {
+                        dbg!(duo, quo, pow, div);
+                        return (quo, duo)
+                    }
+                    duo = duo.wrapping_sub(div);
+                    quo = quo.wrapping_add(pow);
+                    pow >>= 1;
+                    div >>= 1;
+                }
+                println!("duo:{:08b}, quo:{:08b}, pow:{:08b}, div:{:08b}", duo, quo, pow, div);
+            }
+            
+
         }
 
         /// Computes the quotient and remainder of `duo` divided by `div` and returns them as a
