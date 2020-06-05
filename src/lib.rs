@@ -204,8 +204,8 @@ fn leading_zeros_test() {
         }
         if leading_zeros(x) != (x.leading_zeros() as usize) {
             println!("x: {}, expected: {}, found: {}", x, x.leading_zeros(), leading_zeros(x));
+            panic!("failed leading_zeros_test");
         }
-        panic!("failed leading_zeros_test");
     }
 }
 
