@@ -224,7 +224,8 @@ macro_rules! impl_binary_long {
 
             // Perform one binary long division step on the already normalized arguments, and setup
             // all the variables.
-            /*let div_original = div;
+            /*
+            let div_original = div;
             let mut div: $uX = (div << shift);
             let mut pow: $uX = 1 << shift;
             let mut quo: $uX = pow;
@@ -245,8 +246,9 @@ macro_rules! impl_binary_long {
                 }
                 pow >>= 1;
                 div >>= 1;
-            }*/
-            
+            }
+            */
+
             // There is a way to do binary long division without branching or predication, but it
             // requires about 4 extra operations (smearing the sign bit, negating the mask, and
             // applying the mask twice):
@@ -268,7 +270,7 @@ macro_rules! impl_binary_long {
             // division algorithms that can be found on the internet, except there is only one test
             // for `duo < 0`. Unfortunately, it requires about the same number of instructions for
             // one step as the division algorithm above.
-            
+            /*
             let div_original = div;
             let mut div: $uX = (div << shift);
             let mut pow: $uX = 1 << shift;
@@ -304,8 +306,50 @@ macro_rules! impl_binary_long {
                 }
                 println!("duo:{:08b}, quo:{:08b}, pow:{:08b}, div:{:08b}", duo, quo, pow, div);
             }
-            
+            */
 
+            let div_original = div;
+            let mut div: $uX = (div << shift);
+            duo = duo.wrapping_sub(div);
+            // this contains quotient bits that are not added on until the end
+            let mut quo: $uX = 1 << shift;
+            if duo < div_original {
+                return (quo, duo);
+            }
+
+            let mask: $uX;
+            if div >= (1 << ($n - 1)) {
+                // deal with same edge case as before, but the quotient bit from this step has to be
+                // stored in `quo`, since `duo` has not been shifted up yet to allow storage of it.
+                div >>= 1;
+                shift -= 1;
+                let sub = duo.wrapping_sub(div);
+                let tmp = 1 << shift;
+                mask = tmp - 1;
+                if (sub as $iX) >= 0 {
+                    duo = sub;
+                    quo |= tmp;
+                }
+            } else {
+                mask = quo - 1;
+            }
+
+            let div_neg_add_1: $uX = div.wrapping_neg().wrapping_add(1);
+            let div_sub_1: $uX = div.wrapping_sub(1);
+            for _ in 0..shift {
+                if (duo as $iX) < 0 {
+                    // Negated binary long division step.
+                    duo = duo.wrapping_shl(1).wrapping_add(div_sub_1);
+                } else {
+                    // Regular long division step.
+                    duo = duo.wrapping_shl(1).wrapping_add(div_neg_add_1);
+                }
+            }
+            if (duo as $iX) < 0 {
+                duo = div_sub_1.wrapping_add(duo);
+            }
+
+            ((duo & mask) | quo, duo >> shift)
         }
 
         /// Computes the quotient and remainder of `duo` divided by `div` and returns them as a
