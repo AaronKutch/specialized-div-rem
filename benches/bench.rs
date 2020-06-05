@@ -144,6 +144,7 @@ bencher!(
     u32_div_rem_binary_long,
     u32_rem_32_16_binary_long;
 );
+
 bencher!(
     FnKind::DivRem,
     u64,
@@ -192,6 +193,7 @@ bencher!(
     u64_div_rem_trifecta,
     u64_div_rem_64_32_trifecta;
 );
+
 bencher!(
     FnKind::DivRem,
     u128,
@@ -199,8 +201,6 @@ bencher!(
     70,
     u128_div_rem_std,
     u128_div_rem_96_70_std;
-    u128_div_rem_binary_long,
-    u128_div_rem_96_70_binary_long;
     u128_div_rem_delegate,
     u128_div_rem_96_70_delegate;
     u128_div_rem_asymmetric,
@@ -215,8 +215,6 @@ bencher!(
     32,
     u128_div_rem_std,
     u128_div_rem_96_32_std;
-    u128_div_rem_binary_long,
-    u128_div_rem_96_32_binary_long;
     u128_div_rem_delegate,
     u128_div_rem_96_32_delegate;
     u128_div_rem_asymmetric,
@@ -232,8 +230,6 @@ bencher!(
     32,
     i128_div_rem_std,
     i128_div_rem_96_32_std;
-    i128_div_rem_binary_long,
-    i128_div_rem_96_32_binary_long;
     i128_div_rem_delegate,
     i128_div_rem_96_32_delegate;
     i128_div_rem_asymmetric,
@@ -263,8 +259,6 @@ bencher!(
     96,
     u128_div_rem_std,
     u128_div_rem_128_96_std;
-    u128_div_rem_binary_long,
-    u128_div_rem_128_96_binary_long;
     u128_div_rem_delegate,
     u128_div_rem_128_96_delegate;
     u128_div_rem_asymmetric,
@@ -280,8 +274,6 @@ bencher!(
     120,
     u128_div_rem_std,
     u128_div_rem_120_120_std;
-    u128_div_rem_binary_long,
-    u128_div_rem_120_120_binary_long;
     u128_div_rem_delegate,
     u128_div_rem_120_120_delegate;
     u128_div_rem_asymmetric,
@@ -297,8 +289,6 @@ bencher!(
     8,
     u128_div_rem_std,
     u128_div_rem_128_8_std;
-    u128_div_rem_binary_long,
-    u128_div_rem_128_8_binary_long;
     u128_div_rem_delegate,
     u128_div_rem_128_8_delegate;
     u128_div_rem_asymmetric,

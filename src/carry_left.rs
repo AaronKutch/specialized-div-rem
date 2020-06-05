@@ -20,7 +20,6 @@ macro_rules! impl_carry_left {
             #[$unsigned_attr]
         )*
         pub fn $unsigned_name(duo: $uX, div: $uX) -> ($uX, $uX) {
-            let duo_original = duo;
             if div == 0 {
                 panic!("division by zero")
             }
