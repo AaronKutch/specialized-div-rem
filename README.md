@@ -1,10 +1,13 @@
 # Specialized Division and Remainder Algorithms
 
+This crate is not intended for direct use, but for use in parts of compilers (such as
+`compiler-builtins`), so that all division code can benefit.
+
 This crate provides the algorithms, tests, and benchmarks for four different division functions:
 
 - The `_binary_long` functions for CPUs without hardware dividers
 - The `_delegate` functions similar to `_binary_long`, but with calls to smaller divisions if
-  possiblee
+  possible
 - The `_trifecta` functions designed for dividing integers larger than the largest hardware division
   a CPU supports. These become efficient for 128 bit divisions, for both CPUs with and without
   hardware dividers. Note that this function depends upon fast multpliers, such that `_delegate` can
@@ -13,7 +16,8 @@ This crate provides the algorithms, tests, and benchmarks for four different div
   an asymmetric sized hardware division function such as x86_64's division instruction
 
 Note that setting the the `asm` feature flag can cause a significant performance improvement for
-these functions, and is absolutely required for `_asymmetric` to work efficiently.
+these functions, and is absolutely required for `_asymmetric` to work efficiently. The `std` flag is
+only needed for benchmarks and tests.
 
 Most division algorithms end up doing most of the work to get both the quotient and remainder, which
 is why these functions return both (and the compiler can inline and optimize away unused results and

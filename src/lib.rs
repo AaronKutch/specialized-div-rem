@@ -17,9 +17,6 @@ use rand::random;
 mod binary_long;
 
 #[macro_use]
-mod carry_left;
-
-#[macro_use]
 mod delegate;
 
 #[macro_use]
@@ -177,16 +174,6 @@ pub const fn leading_zeros(x: usize) -> usize {
 }
 
 #[test]
-fn lkj() {
-    println!("binary_long");
-    let duo = 255;
-    let div = 3;
-    u8_div_rem_binary_long(duo, div);
-    println!("carry_left");
-    panic!("{:?}", u8_div_rem_carry_left(duo, div));
-}
-
-#[test]
 fn leading_zeros_test() {
     // binary fuzzer
     let mut x = 0usize;
@@ -212,14 +199,107 @@ fn leading_zeros_test() {
     }
 }
 
-#[inline]
-fn u16_by_u16_div_rem(duo: u16, div: u16) -> (u16, u16) {
-    (duo / div, duo % div)
+macro_rules! test {
+    (
+        $n:expr, // the number of bits in a $iX or $uX
+        $uX:ident, // unsigned integer that will be shifted
+        $iX:ident, // signed version of $uX
+        // list of triples of the test name, the unsigned division function, and the signed
+        // division function
+        $($test_name:ident, $unsigned_name:ident, $signed_name:ident);+
+    ) => {
+        $(
+            #[test]
+            fn $test_name() {
+                // checks all possible single continuous strings of ones (except when all bits
+                    // are zero) uses about 68 million iterations for T = u128
+                    let mut lhs0: $uX = 1;
+                    for i0 in 1..=$n {
+                    let mut lhs1 = lhs0;
+                    for i1 in 0..i0 {
+                        let mut rhs0: $uX = 1;
+                        for i2 in 1..=$n {
+                            let mut rhs1 = rhs0;
+                            for i3 in 0..i2 {
+                                if $unsigned_name(lhs1,rhs1) !=
+                                    (
+                                        lhs1.wrapping_div(rhs1),
+                                        lhs1.wrapping_rem(rhs1)
+                                    ) {
+                                    println!(
+                                        "lhs:{} rhs:{} expected:({}, {}) found:({},{})",
+                                        lhs1,
+                                        rhs1,
+                                        lhs1.wrapping_div(rhs1),
+                                        lhs1.wrapping_rem(rhs1),
+                                        $unsigned_name(lhs1,rhs1).0,
+                                        $unsigned_name(lhs1,rhs1).1
+                                    );
+                                    panic!("failed division test");
+                                }
+                                if $signed_name(lhs1 as $iX,rhs1 as $iX) !=
+                                    (
+                                        (lhs1 as $iX).wrapping_div(rhs1 as $iX),
+                                        (lhs1 as $iX).wrapping_rem(rhs1 as $iX)
+                                    ) {
+                                    println!(
+                                        "lhs:{} rhs:{} expected:({}, {}) found:({},{})",
+                                        lhs1,
+                                        rhs1,
+                                        lhs1.wrapping_div(rhs1),
+                                        lhs1.wrapping_rem(rhs1),
+                                        $signed_name(lhs1 as $iX,rhs1 as $iX).0,
+                                        $signed_name(lhs1 as $iX,rhs1 as $iX).1
+                                    );
+                                    panic!("failed division test");
+                                }
+                                
+                                rhs1 ^= 1 << i3;
+                            }
+                            rhs0 <<= 1;
+                            rhs0 |= 1;
+                        }
+                        lhs1 ^= 1 << i1;
+                    }
+                    lhs0 <<= 1;
+                    lhs0 |= 1;
+                }
+                // binary fuzzer
+                let mut lhs: $uX = 0;
+                let mut rhs: $uX = 0;
+                let mut ones: $uX;
+                // creates a mask for indexing the bits of the type
+                let bit_selector_max = $n - 1;
+                for _ in 0..10_000_000 {
+                    for _ in 0..4 {
+                        let r0: u32 = bit_selector_max & random::<u32>();
+                        ones = !0 >> r0;
+                        let r1: u32 = bit_selector_max & random::<u32>();
+                        let mask = ones.rotate_left(r1);
+                        match (random(),random(),random()) {
+                            (false,false,false) => lhs |= mask,
+                            (false,false,true) => lhs &= mask,
+                            (false,true,_) => lhs ^= mask,
+                            (true,false,false) => rhs |= mask,
+                            (true,false,true) => rhs &= mask,
+                            (true,true,_) => rhs ^= mask,
+                        }
+                    }
+                    if rhs != 0 {
+                        assert_eq!(
+                            (lhs.wrapping_div(rhs), lhs.wrapping_rem(rhs)),
+                            $unsigned_name(lhs,rhs)
+                        );
+                    }
+                }
+            }
+        )+
+    }
 }
 
 #[inline]
-unsafe fn u32_by_u16_div_rem(duo: u32, div: u16) -> (u16, u16) {
-    ((duo / (div as u32)) as u16, (duo % (div as u32)) as u16)
+fn u16_by_u16_div_rem(duo: u16, div: u16) -> (u16, u16) {
+    (duo / div, duo % div)
 }
 
 #[inline]
@@ -296,104 +376,6 @@ unsafe fn u128_by_u64_div_rem(duo: u128, div: u64) -> (u64, u64) {
     (quo, rem)
 }
 
-macro_rules! test {
-    (
-        $n:expr, // the number of bits in a $iX or $uX
-        $uX:ident, // unsigned integer that will be shifted
-        $iX:ident, // signed version of $uX
-        // list of triples of the test name, the unsigned division function, and the signed
-        // division function
-        $($test_name:ident, $unsigned_name:ident, $signed_name:ident);+
-    ) => {
-        $(
-            #[test]
-            fn $test_name() {
-                // checks all possible single continuous strings of ones (except when all bits
-                // are zero) uses about 68 million iterations for T = u128
-                let mut lhs0: $uX = 1;
-                for i0 in 1..=$n {
-                    let mut lhs1 = lhs0;
-                    for i1 in 0..i0 {
-                        let mut rhs0: $uX = 1;
-                        for i2 in 1..=$n {
-                            let mut rhs1 = rhs0;
-                            for i3 in 0..i2 {
-                                if $unsigned_name(lhs1,rhs1) !=
-                                    (
-                                        lhs1.wrapping_div(rhs1),
-                                        lhs1.wrapping_rem(rhs1)
-                                    ) {
-                                    println!(
-                                        "lhs:{} rhs:{} expected:({}, {}) found:({},{})",
-                                        lhs1,
-                                        rhs1,
-                                        lhs1.wrapping_div(rhs1),
-                                        lhs1.wrapping_rem(rhs1),
-                                        $unsigned_name(lhs1,rhs1).0,
-                                        $unsigned_name(lhs1,rhs1).1
-                                    );
-                                    panic!("failed division test");
-                                }
-                                if $signed_name(lhs1 as $iX,rhs1 as $iX) !=
-                                    (
-                                        (lhs1 as $iX).wrapping_div(rhs1 as $iX),
-                                        (lhs1 as $iX).wrapping_rem(rhs1 as $iX)
-                                    ) {
-                                    println!(
-                                        "lhs:{} rhs:{} expected:({}, {}) found:({},{})",
-                                        lhs1,
-                                        rhs1,
-                                        lhs1.wrapping_div(rhs1),
-                                        lhs1.wrapping_rem(rhs1),
-                                        $signed_name(lhs1 as $iX,rhs1 as $iX).0,
-                                        $signed_name(lhs1 as $iX,rhs1 as $iX).1
-                                    );
-                                    panic!("failed division test");
-                                }
-
-                                rhs1 ^= 1 << i3;
-                            }
-                            rhs0 <<= 1;
-                            rhs0 |= 1;
-                        }
-                        lhs1 ^= 1 << i1;
-                    }
-                    lhs0 <<= 1;
-                    lhs0 |= 1;
-                }
-                // binary fuzzer
-                let mut lhs: $uX = 0;
-                let mut rhs: $uX = 0;
-                let mut ones: $uX;
-                // creates a mask for indexing the bits of the type
-                let bit_selector_max = $n - 1;
-                for _ in 0..10_000_000 {
-                    for _ in 0..4 {
-                        let r0: u32 = bit_selector_max & random::<u32>();
-                        ones = !0 >> r0;
-                        let r1: u32 = bit_selector_max & random::<u32>();
-                        let mask = ones.rotate_left(r1);
-                        match (random(),random(),random()) {
-                            (false,false,false) => lhs |= mask,
-                            (false,false,true) => lhs &= mask,
-                            (false,true,_) => lhs ^= mask,
-                            (true,false,false) => rhs |= mask,
-                            (true,false,true) => rhs &= mask,
-                            (true,true,_) => rhs ^= mask,
-                        }
-                    }
-                    if rhs != 0 {
-                        assert_eq!(
-                            (lhs.wrapping_div(rhs), lhs.wrapping_rem(rhs)),
-                            $unsigned_name(lhs,rhs)
-                        );
-                    }
-                }
-            }
-        )+
-    }
-}
-
 // Note: one reason for the macros having a `$half_division:ident` instead of directly calling the
 // `/` and `%` builtin operators is that allows using different algorithms for the half
 // division instead of just the default.
@@ -405,19 +387,14 @@ macro_rules! test {
 // `u128_div_rem_trifecta` (except if the hardware does not have a fast enough multiplier, in which
 // case `u128_div_rem_delegate` should be used).
 
+// Note: The overhead of the existing binary long division algorithm setup is high enough that
+// faster algorithms for 8 bit and 16 bit divisions probably exist. However, the smallest division
+// in `compiler-builtins` is 32 bits, so these cases are only left in for testing purposes.
+
 // 8 bit
 impl_binary_long!(
     u8_div_rem_binary_long,
     i8_div_rem_binary_long,
-    8,
-    u8,
-    i8,
-    inline;
-    inline
-);
-impl_carry_left!(
-    u8_div_rem_carry_left,
-    i8_div_rem_carry_left,
     8,
     u8,
     i8,
@@ -430,10 +407,7 @@ test!(
     i8,
     div_rem_binary_long_8,
     u8_div_rem_binary_long,
-    i8_div_rem_binary_long;
-    div_rem_carry_left_8,
-    u8_div_rem_carry_left,
-    i8_div_rem_carry_left
+    i8_div_rem_binary_long
 );
 
 // 16 bit
@@ -477,19 +451,6 @@ impl_delegate!(
     inline;
     inline
 );
-impl_asymmetric!(
-    u32_div_rem_asymmetric,
-    i32_div_rem_asymmetric,
-    u16_by_u16_div_rem,
-    u32_by_u16_div_rem,
-    8,
-    u8,
-    u16,
-    u32,
-    i32,
-    inline;
-    inline
-);
 test!(
     32,
     u32,
@@ -499,10 +460,7 @@ test!(
     i32_div_rem_binary_long;
     div_rem_delegate_32,
     u32_div_rem_delegate,
-    i32_div_rem_delegate;
-    div_rem_asymmetric_32,
-    u32_div_rem_asymmetric,
-    i32_div_rem_asymmetric
+    i32_div_rem_delegate
 );
 
 // 64 bit

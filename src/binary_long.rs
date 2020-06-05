@@ -12,10 +12,7 @@ macro_rules! impl_binary_long {
         /// tuple.
         ///
         /// This uses binary long division with no calls to smaller divisions, and is designed for
-        /// CPUs without fast division hardware for small integers. This algorithm is designed for
-        /// architectures that do not have predicated arithmetic instructions or flags, such as
-        /// RISC-V (without the M extension). Use `_carry_left` instead for architectures with the
-        /// necessary arithmetic instructions.
+        /// CPUs without fast division hardware.
         ///
         /// # Panics
         ///
@@ -188,10 +185,13 @@ macro_rules! impl_binary_long {
             // now `shift == 0` so `quo` is now the correct quotient of 29u8 and `duo` is the
             // remainder 4u8
             /*
+            let div_original = div;
             let mut div = div << shift;
             let mut quo = 0;
             loop {
                 let sub = duo.wrapping_sub(div);
+                // it is recommended to use `println!`s like this if functionality is unclear
+                //println!("duo:{:08b}, div:{:08b}, sub:{:08b}, shift:{}", duo, div, sub, shift);
                 if (sub as $iX) >= 0 {
                     duo = sub;
                     quo |= 1;
@@ -212,19 +212,18 @@ macro_rules! impl_binary_long {
             // In the above algorithm, notice that `quo` is gradually being shifted up and having a
             // 1 OR'ed into its least significant bit. One some architectures, this can be
             // accomplished in one add-with-carry instruction that adds `quo` to itself to shift up
-            // by one, and the least significant bit is set if the carry flag is clear. However, we
-            // are targeting architectures without such functionality. Instead of shifting `quo`, we
-            // shift a power-of-two `pow` right on each step, and OR it in place with `quo` when
-            // normalized. The `duo < div_original` check can be used in place of the `shift == 0`
-            // check, so `shift` can be removed entirely. It results in 5 instructions being
-            // executed for unnormalized steps, and 8 instructions for normalized steps. Unrolled,
-            // `quo |= pow` can be done with a constant, and the unconditional branch can be
-            // eliminated, eliminating two instructions. Assuming both kinds of steps are equally
-            // likely, each step takes 4 assembly instructions on average.
+            // by one, and the least significant bit is set if the carry flag is clear. However,
+            // there are many architectures without such functionality (e.g. RISC-V without the `M`
+            // extension). Instead of shifting `quo`, we could shift a power-of-two `pow` right on
+            // each step, and bitwise-or it in place with `quo` when normalized. The
+            // `duo < div_original` check can be used in place of the `shift == 0` check, and `pow`
+            // can be shifted right instead of needing to recalculate it from `1 << shift`, so
+            // `shift` can be removed entirely. The following algorithm is the fastest restoring
+            // division algorithm that does not rely on carry flags or add-with-carry.
 
+            /*
             // Perform one binary long division step on the already normalized arguments, and setup
             // all the variables.
-            /*
             let div_original = div;
             let mut div: $uX = (div << shift);
             let mut pow: $uX = 1 << shift;
@@ -249,10 +248,11 @@ macro_rules! impl_binary_long {
             }
             */
 
-            // There is a way to do binary long division without branching or predication, but it
-            // requires about 4 extra operations (smearing the sign bit, negating the mask, and
-            // applying the mask twice):
+            // There is a way to do restoring binary long division without branching or predication,
+            // but it requires about 4 extra operations (smearing the sign bit, negating the mask,
+            // and applying the mask twice):
             //
+            // (example of central loop)
             // let sub = duo.wrapping_sub(div);
             // let sign_mask = !(((sub as $iX) >> ($n - 1)) as $uX);
             // duo -= div & sign_mask;
@@ -264,19 +264,83 @@ macro_rules! impl_binary_long {
             // would still need to be inserted at regular intervals to make sure exact divisions are
             // fast.
 
+            // If the architecture has flags and predicated arithmetic instructions, it is possible
+            // to do binary long division without branching and in only 3 or 4 instructions. This is
+            // a variation of a 3 instruction central loop from
+            // http://www.chiark.greenend.org.uk/~theom/riscos/docs/ultimate/a252div.txt.
+            //
+            // What allows doing division in only 3 instructions is realizing that instead of
+            // keeping `duo` in place and shifting `div` right to align bits, `div` can be kept in
+            // place and `duo` can be shifted left. This would not normally save any instructions
+            // and just cause more edge case problems and make `duo < div_original` tests harder.
+            // However, some architectures have an option to shift an argument in an arithmetic
+            // operation, meaning `duo` can be shifted left and subtracted from in one instruction.
+            // `div` never has to be written to in the loop. The other two instructions are updating
+            // `quo` and undoing the subtraction if it turns out things were not normalized.
+            /*
+            // Perform one binary long division step on the already normalized arguments, and setup
+            // all the variables.
+            let div_original = div;
+            let mut div: $uX = (div << shift);
+            let mut quo: $uX = 1;
+            duo = duo.wrapping_sub(div);
+            if duo < div_original {
+                // early return for powers of two and close to powers of two
+                return (1 << shift, duo);
+            }
+            // The add-with-carry that updates `quo` needs to have the carry set when a normalized
+            // subtract happens. Using `duo.wrapping_shl(1).overflowing_sub(div)` to do the
+            // subtraction generates a carry when an unnormalized subtract happens, which is the
+            // opposite of what we want. Instead, we use
+            // `duo.wrapping_shl(1).overflowing_add(div_neg)`, where `div_neg` is negative `div`.
+            let div_neg: $uX;
+            if div >= (1 << ($n - 1)) {
+                // A very ugly edge case where the most significant bit of `div` is set (after
+                // shifting to match `duo` when its most significant bit is at the sign bit), which
+                // leads to the sign bit of `div_neg` being cut off and carries not happening when
+                // they should. This performs a long division step that keeps `duo` in place and
+                // shifts `div` down.
+                div >>= 1;
+                div_neg = div.wrapping_neg();
+                let (sub, carry) = duo.overflowing_add(div_neg);
+                duo = sub;
+                quo = quo.wrapping_add(quo).wrapping_add(carry as $uX);
+                if !carry {
+                    duo = duo.wrapping_add(div);
+                }
+                shift -= 1;
+            } else {
+                div_neg = div.wrapping_neg();
+            }
+            for _ in 0..shift {
+                // `ADDS duo, div, duo, LSL #1`
+                // (add div to duo shifted left 1 and set flags)
+                let (sub, carry) = duo.wrapping_shl(1).overflowing_add(div_neg);
+                duo = sub;
+                // `ADC quo, quo, quo`
+                // (add with carry). Effectively shifts `quo` left by 1 and sets the least
+                // significant bit to the carry.
+                quo = quo.wrapping_add(quo).wrapping_add(carry as $uX);
+                // `ADDCC duo, duo, div`
+                // (add if carry clear). Undoes the subtraction if no carry was generated.
+                if !carry {
+                    // undo the subtraction
+                    duo = duo.wrapping_add(div);
+                }
+            }
+            return (quo, duo >> shift);
+            */
+
             // Another kind of long division uses an interesting fact that `div` and `pow` can be
             // negated when `duo` is negative to perform a "negated" division step that works in
-            // place of any normalization mechanism. It is very similar to the non-restoring
-            // division algorithms that can be found on the internet, except there is only one test
-            // for `duo < 0`. Unfortunately, it requires about the same number of instructions for
-            // one step as the division algorithm above.
+            // place of any normalization mechanism. This is a non-restoring division algorithm that
+            // is very similar to the non-restoring division algorithms that can be found on the
+            // internet, except there is only one test for `duo < 0`.
             /*
             let div_original = div;
             let mut div: $uX = (div << shift);
             let mut pow: $uX = 1 << shift;
             let mut quo: $uX = pow;
-            dbg!("start", duo, quo, pow, div);
-            println!("duo:{:08b}, quo:{:08b}, pow:{:08b}, div:{:08b}", duo, quo, pow, div);
 
             duo = duo.wrapping_sub(div);
             if duo < div_original {
@@ -284,9 +348,7 @@ macro_rules! impl_binary_long {
             }
             div >>= 1;
             pow >>= 1;
-            println!("duo:{:08b}, quo:{:08b}, pow:{:08b}, div:{:08b}", duo, quo, pow, div);
             loop {
-                //dbg!(duo, quo, pow, div);
                 if (duo as $iX) < 0 {
                     // Negated binary long division step.
                     duo = duo.wrapping_add(div);
@@ -296,7 +358,6 @@ macro_rules! impl_binary_long {
                 } else {
                     // Regular long division step.
                     if duo < div_original {
-                        dbg!(duo, quo, pow, div);
                         return (quo, duo)
                     }
                     duo = duo.wrapping_sub(div);
@@ -304,14 +365,33 @@ macro_rules! impl_binary_long {
                     pow >>= 1;
                     div >>= 1;
                 }
-                println!("duo:{:08b}, quo:{:08b}, pow:{:08b}, div:{:08b}", duo, quo, pow, div);
             }
             */
+
+            // This final variation is the SWAR (SIMD within in a register) binary long division
+            // algorithm. This combines several ideas of the above algorithms:
+            //  - If `duo` is shifted left instead of shifting `div` right like in the 3 instruction
+            //    restoring division algorithm, some architectures can do the shifting and
+            //    subtraction step in one instruction.
+            //  - `quo` can be constructed by adding powers-of-two to it, shifting
+            //    it left by one and adding one, or shifting left and subtracting one in a
+            //    non-restoring step.
+            //  - The non-restoring division algorithm is very symmetric when adding and subtracting
+            //    to `duo` in quo`.
+            //  - Every time `duo` is shifted left, there is another unused 0 bit shifted into the
+            //    LSB, so what if we use those bits to store `quo`?
+            // Through a complex setup, it is possible to manage `duo` and `quo` in the same
+            // register, and perform one step with one instruction. Even better, add-with-carry is
+            // not needed, and the shift left of `duo` is common to every step. This means the
+            // central loop when unrolled can be implemented with 2 or 3 instructions on most
+            // architectures. The only major downsides are that `duo < div_original` checks are
+            // impractical, and the number of division steps taken has to be exact.
 
             let div_original = div;
             let mut div: $uX = (div << shift);
             duo = duo.wrapping_sub(div);
-            // this contains quotient bits that are not added on until the end
+            // Until `duo` has been shifted left, there is no room for quotient bits in `duo`, so
+            // we store the bits here and add them on at the end.
             let mut quo: $uX = 1 << shift;
             if duo < div_original {
                 return (quo, duo);
@@ -319,17 +399,18 @@ macro_rules! impl_binary_long {
 
             let mask: $uX;
             if div >= (1 << ($n - 1)) {
-                // deal with same edge case as before, but the quotient bit from this step has to be
-                // stored in `quo`, since `duo` has not been shifted up yet to allow storage of it.
+                // deal with same edge case as the 3 instruction restoring division algorithm, but
+                // the quotient bit from this step has to be stored in `quo`
                 div >>= 1;
                 shift -= 1;
-                let sub = duo.wrapping_sub(div);
                 let tmp = 1 << shift;
-                mask = tmp - 1;
+                let sub = duo.wrapping_sub(div);
                 if (sub as $iX) >= 0 {
+                    // restore
                     duo = sub;
                     quo |= tmp;
                 }
+                mask = tmp - 1;
             } else {
                 mask = quo - 1;
             }
@@ -346,20 +427,18 @@ macro_rules! impl_binary_long {
                 }
             }
             if (duo as $iX) < 0 {
+                // Restore.
                 duo = div_sub_1.wrapping_add(duo);
             }
 
-            ((duo & mask) | quo, duo >> shift)
+            return ((duo & mask) | quo, duo >> shift);
         }
 
         /// Computes the quotient and remainder of `duo` divided by `div` and returns them as a
         /// tuple.
         ///
         /// This uses binary long division with no calls to smaller divisions, and is designed for
-        /// CPUs without fast division hardware for small integers. This algorithm is designed for
-        /// architectures that do not have predicated arithmetic instructions or flags, such as
-        /// RISC-V (without the M extension). Use `_carry_left` instead for architectures with the
-        /// necessary arithmetic instructions.
+        /// CPUs without fast division hardware.
         ///
         /// # Panics
         ///
