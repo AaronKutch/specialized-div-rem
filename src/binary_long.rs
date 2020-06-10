@@ -382,9 +382,7 @@ macro_rules! impl_binary_long {
             //    LSB, so what if we use those bits to store `quo`?
             // Through a complex setup, it is possible to manage `duo` and `quo` in the same
             // register, and perform one step with one instruction. Even better, add-with-carry is
-            // not needed, and the shift left of `duo` is common to every step. This means the
-            // central loop when unrolled can be implemented with 2 or 3 instructions on most
-            // architectures. The only major downsides are that `duo < div_original` checks are
+            // not needed. The only major downsides are that `duo < div_original` checks are
             // impractical, and the number of division steps taken has to be exact.
 
             let div_original = div;
@@ -410,25 +408,37 @@ macro_rules! impl_binary_long {
                     duo = sub;
                     quo |= tmp;
                 }
+                // need this so that a check at the beginning of loops is not needed
+                if duo < div_original {
+                    return (quo, duo);
+                }
                 mask = tmp - 1;
             } else {
                 mask = quo - 1;
             }
 
-            let div_neg_add_1: $uX = div.wrapping_neg().wrapping_add(1);
-            let div_sub_1: $uX = div.wrapping_sub(1);
-            for _ in 0..shift {
+            // the subtracted one acts as a negative one for the quotient inside `duo`
+            let div: $uX = div.wrapping_sub(1);
+            let mut i = 0;
+            loop {
+                // note: the `duo.wrapping_shl(1)` cannot be factored out because it would require
+                // another restoring division step to prevent `(duo as $iX)` from overflowing
                 if (duo as $iX) < 0 {
                     // Negated binary long division step.
-                    duo = duo.wrapping_shl(1).wrapping_add(div_sub_1);
+                    duo = duo.wrapping_shl(1).wrapping_add(div);
                 } else {
                     // Regular long division step.
-                    duo = duo.wrapping_shl(1).wrapping_add(div_neg_add_1);
+                    duo = duo.wrapping_shl(1).wrapping_sub(div);
+                }
+                i += 1;
+                if i == shift {
+                    break;
                 }
             }
             if (duo as $iX) < 0 {
-                // Restore.
-                duo = div_sub_1.wrapping_add(duo);
+                // Extra negated binary long division step. This is not needed in the original
+                // nonrestoring algorithm because of the `duo < div_original` checks
+                duo = duo.wrapping_add(div);
             }
 
             return ((duo & mask) | quo, duo >> shift);
