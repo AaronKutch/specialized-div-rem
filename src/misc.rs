@@ -1,3 +1,184 @@
+#[cfg(test)]
+use rand::random;
+
+/// Returns the number of leading binary zeros in `x`.
+///
+/// Counting leading zeros is performance critical to certain division algorithms and more. This is
+/// a fast software routine for CPU architectures without an assembly instruction to quickly
+/// calculate `leading_zeros`.
+pub const fn leading_zeros(x: usize) -> usize {
+    // Note: This routine produces the correct value for `x == 0`. Zero is probably common enough
+    // that it could warrant adding a zero check at the beginning, but it was decided not to do
+    // this. This code is meant to be the routine for `compiler-builtins` functions like `__clzsi2`
+    // which have a precondition that `x != 0`. Compilers will insert the check for zero in cases
+    // where it is needed.
+
+    // The base idea is to mask the higher bits of `x` and compare them to zero to bisect the number
+    // of leading zeros. For an example, if we are finding the leading zeros of a `u8`, we could
+    // check if `x & 0b1111_0000` is zero. If it is zero, then the number of leading zeros is at
+    // least 4, otherwise it is less than 4. If `(x & 0b1111_0000) == 0`, then we could branch to
+    // another check for if `x & 0b1111_1100` is zero. If `(x & 0b1111_1100) != 0`, then the number
+    // of leading zeros is at least 4 but less than 6. One more bisection with `x & 0b1111_1000`
+    // determines the number of leading zeros to be 4 if `(x & 0b1111_1000) != 0` and 5 otherwise.
+    //
+    // However, we do not want to have 6 levels of bisection to 64 leaf nodes and hundreds of bytes
+    // of instruction code if `usize` has a bit width of 64. It is possible for all branches of the
+    // bisection to use the same code path by conditional shifting and focusing on smaller parts:
+    /*
+    let mut x = x;
+    // temporary
+    let mut t: usize;
+    // The number of potential leading zeros, assuming that `usize` has a bitwidth of 64 bits
+    let mut z: usize = 64;
+
+    t = x >> 32;
+    if t != 0 {
+        // one of the upper 32 bits is set, so the 32 lower bits are now irrelevant and can be
+        // removed from the number of potential leading zeros
+        z -= 32;
+        // shift `x` so that the next step can deal with the upper 32 bits, otherwise the lower 32
+        // bits would be checked by the next step.
+        x = t;
+    }
+    t = x >> 16;
+    if t != 0 {
+        z -= 16;
+        x = t;
+    }
+    t = x >> 8;
+    if t != 0 {
+        z -= 8;
+        x = t;
+    }
+    t = x >> 4;
+    if t != 0 {
+        z -= 4;
+        x = t;
+    }
+    t = x >> 2;
+    if t != 0 {
+        z -= 2;
+        x = t;
+    }
+    // combine the last two steps
+    t = x >> 1;
+    if t != 0 {
+        return z - 2;
+    } else {
+        return z - x;
+    }
+    */
+    // The above method has short branches in it which can cause pipeline problems on some
+    // platforms, or the compiler removes the branches but at the cost of huge instruction counts
+    // from heavy bit manipulation. We can remove the branches by turning `(x & constant) != 0`
+    // boolean expressions into an integer.
+
+    // Adapted from LLVM's `compiler-rt/lib/builtins/clzsi2.c`. The original sets the number of
+    // zeros `z` to be 0 and add to that:
+    //
+    // // If the upper bits are zero, set `t` to `1 << level`
+    // let t = (((x & const) == 0) as usize) << level;
+    // // If the upper bits are zero, the right hand side expression cancels to zero and no shifting
+    // // occurs
+    // x >>= (1 << level) - t;
+    // // If the upper bits are zero, `1 << level` is added to `z`
+    // z += t;
+    //
+    // It saves some instructions to start `z` at 64 and subtract from that with a negated process
+    // instead:
+    //
+    // // use `!=` comparison instead
+    // let t = (((x & const) != 0) as usize) << level;
+    // // shift if the upper bits are not zero
+    // x >>= t;
+    // // subtract from the number of potential leading zeros
+    // z -= t;
+
+    let mut x = x;
+    // The number of potential leading zeros
+    let mut z = {
+        #[cfg(target_pointer_width = "64")]
+        {
+            64
+        }
+        #[cfg(target_pointer_width = "32")]
+        {
+            32
+        }
+        #[cfg(target_pointer_width = "16")]
+        {
+            16
+        }
+    };
+
+    // a temporary
+    let mut t: usize;
+
+    #[cfg(target_pointer_width = "64")]
+    {
+        t = (((x & 0xFFFF_FFFF_0000_0000) != 0) as usize) << 5;
+        x >>= t;
+        z -= t;
+    }
+
+    #[cfg(any(target_pointer_width = "32", target_pointer_width = "64"))]
+    {
+        t = (((x & 0xFFFF_0000) != 0) as usize) << 4;
+        x >>= t;
+        z -= t;
+    }
+
+    t = (((x & 0xFF00) != 0) as usize) << 3;
+    x >>= t;
+    z -= t;
+
+    t = (((x & 0xF0) != 0) as usize) << 2;
+    x >>= t;
+    z -= t;
+
+    t = (((x & 0b1100) != 0) as usize) << 1;
+    x >>= t;
+    z -= t;
+
+    t = ((x & 0b10) != 0) as usize;
+    x >>= t;
+    z -= t;
+
+    // All bits except LSB are guaranteed to be zero by this point. If `x != 0` then `x == 1` and
+    // subtracts a potential zero from `z`.
+    z - x
+}
+
+#[test]
+fn leading_zeros_test() {
+    // binary fuzzer
+    let mut x = 0usize;
+    let mut ones: usize;
+    // creates a mask for indexing the bits of the type
+    let bit_indexing_mask = usize::MAX.count_ones() - 1;
+    for _ in 0..1000 {
+        for _ in 0..4 {
+            let r0: u32 = bit_indexing_mask & random::<u32>();
+            ones = !0 >> r0;
+            let r1: u32 = bit_indexing_mask & random::<u32>();
+            let mask = ones.rotate_left(r1);
+            match (random(), random()) {
+                (false, false) => x |= mask,
+                (false, true) => x &= mask,
+                (true, _) => x ^= mask,
+            }
+        }
+        if leading_zeros(x) != (x.leading_zeros() as usize) {
+            panic!(
+                "x: {}, expected: {}, found: {}",
+                x,
+                x.leading_zeros(),
+                leading_zeros(x)
+            );
+        }
+    }
+}
+
 /// Creates multiple intensive test functions for division functions of a certain size
 macro_rules! test {
     (
