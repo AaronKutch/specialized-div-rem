@@ -5,7 +5,7 @@ macro_rules! impl_delegate {
         $half_division:ident, // function for division of a $uX by a $uX
         $n_h:expr, // the number of bits in $iH or $uH
         $uH:ident, // unsigned integer with half the bit width of $uX
-        $uX:ident, // unsigned integer with half the bit width of $uD. 
+        $uX:ident, // unsigned integer with half the bit width of $uD.
         $uD:ident, // unsigned integer type for the inputs and outputs of `$unsigned_name`
         $iD:ident, // signed integer type for the inputs and outputs of `$signed_name`
         $($unsigned_attr:meta),*; // attributes for the unsigned function
@@ -13,13 +13,13 @@ macro_rules! impl_delegate {
     ) => {
         /// Computes the quotient and remainder of `duo` divided by `div` and returns them as a
         /// tuple.
-        /// 
+        ///
         /// This uses binary long division, but if it can delegates work to a smaller division. This
         /// function is intended for divisions of integers larger than the register size on CPUs
         /// that do not have fast multiplication or division hardware.
-        /// 
+        ///
         /// # Panics
-        /// 
+        ///
         /// When attempting to divide by zero, this function will panic.
         $(
             #[$unsigned_attr]
@@ -168,13 +168,13 @@ macro_rules! impl_delegate {
 
         /// Computes the quotient and remainder of `duo` divided by `div` and returns them as a
         /// tuple.
-        /// 
+        ///
         /// This uses binary long division, but if it can delegates work to a smaller division. This
         /// function is intended for divisions of integers larger than the register size on CPUs
         /// that do not have fast multiplication or division hardware.
-        /// 
+        ///
         /// # Panics
-        /// 
+        ///
         /// When attempting to divide by zero, this function will panic.
         $(
             #[$signed_attr]
