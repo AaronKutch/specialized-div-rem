@@ -57,7 +57,7 @@ macro_rules! impl_trifecta {
             let n = $n_h * 2;
 
             if div == 0 {
-                panic!("division by zero")
+                panic!("attempt to divide by zero")
             }
 
             // Note that throughout this function, `lo` and `hi` refer to the high and low `n` bits

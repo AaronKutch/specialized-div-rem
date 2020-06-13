@@ -1,3 +1,5 @@
+//! miscellanious functions and macros used in the rest of the crate
+
 #[cfg(test)]
 use rand::random;
 
@@ -305,4 +307,124 @@ macro_rules! test {
             }
         )+
     }
+}
+
+/// Repeats a block of code `$b`. The number of repeats corresponds to `log2($n) - 1`, where `$n`
+/// is the power-of-two literal token. This is intended for unrolling bisection algorithms.
+macro_rules! repeat_log {
+    (128, $b:block) => {
+        $b;
+        repeat_log!(64, $b);
+    };
+    (64, $b:block) => {
+        $b;
+        repeat_log!(32, $b);
+    };
+    (32, $b:block) => {
+        $b;
+        repeat_log!(16, $b);
+    };
+    (16, $b:block) => {
+        $b;
+        repeat_log!(8, $b);
+    };
+    (8, $b:block) => {
+        $b;
+        repeat_log!(4, $b);
+    };
+    (4, $b:block) => {
+        $b;
+    };
+}
+
+/// Unrolls a loop containing a block of code `$b`. `$i` should be a mutable `isize` set to the
+/// number of times the block of code should be run. NOTE: the state of `$i` is not guaranteed to be
+/// anything during and after execution of the code fed to this macro, so the variable designated
+/// by `$i` must not be used by the block of code or any code after the macro.
+///
+/// This macro called as `unroll!($n, $i, $b);` is equivalent to
+/// `
+/// // for _ in 0..$i {
+/// //     $b;
+/// // }
+/// `
+/// The power-of-two literal token does not effect the logic, but it does effect code size and
+/// performance.
+#[rustfmt::skip]
+macro_rules! unroll {
+    (128, $i:ident, $b:block) => {
+        unroll!(64, $i, $b);
+    };
+    (64, $i:ident, $b:block) => {
+        unroll!(32, $i, $b);
+    };
+    (32, $i:ident, $b:block) => {
+        // Code gen is almost always too large to unroll 16 times or more. If the block consists of
+        // only one or two assembly instructions, it is probably better to code a custom assembly
+        // variable jump into an unrolled loop.
+        /*
+        loop {
+            $i -= 16;
+            if $i < 0 {
+                break;
+            }
+            $b;$b;$b;$b;$b;$b;$b;$b;$b;$b;$b;$b;$b;$b;$b;$b;
+        }
+        $i += 16;
+        if $i != 0 {
+            unroll!(16, $i, $b);
+        }
+        */
+        unroll!(16, $i, $b);
+    };
+    (16, $i:ident, $b:block) => {
+        // loop management is kept down to 2 instructions for each loop, plus 2 instructions for
+        // every change to a smaller unroll with this method.
+        loop {
+            $i -= 8;
+            if $i < 0 {
+                break;
+            }
+            $b;$b;$b;$b;$b;$b;$b;$b;
+        }
+        $i += 8;
+        // The check for zero is not required, but is a simple way to improve performance
+        if $i != 0 {
+            unroll!(8, $i, $b);
+        }
+    };
+    (8, $i:ident, $b:block) => {
+        loop {
+            $i -= 4;
+            if $i < 0 {
+                break;
+            }
+            $b;$b;$b;$b;
+        }
+        $i += 4;
+        if $i != 0 {
+            unroll!(4, $i, $b);
+        }
+    };
+    (4, $i:ident, $b:block) => {
+        loop {
+            $i -= 2;
+            if $i < 0 {
+                break;
+            }
+            $b;$b;
+        }
+        if $i == -1 {
+            $b;
+        }
+    };
+    (2, $i:ident, $b:block) => {
+        loop {
+            $i -= 1;
+            if $i < 0 {
+                break;
+            }
+            $b;
+        }
+    };
 }

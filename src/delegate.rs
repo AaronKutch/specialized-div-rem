@@ -35,7 +35,7 @@ macro_rules! impl_delegate {
 
             match (div_lo == 0, div_hi == 0, duo_hi == 0) {
                 (true, true, _) => {
-                    panic!("division by zero")
+                    panic!("attempt to divide by zero")
                 }
                 (_, false, true) => {
                     // `duo` < `div`

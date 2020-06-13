@@ -2,7 +2,7 @@ macro_rules! impl_binary_long {
     (
         $unsigned_name:ident, // name of the unsigned division function
         $signed_name:ident, // name of the signed division function
-        $n:expr, // the number of bits in a $iX or $uX
+        $n:tt, // the number of bits in a $iX or $uX
         $uX:ident, // unsigned integer type for the inputs and outputs of `$unsigned_name`
         $iX:ident, // signed integer type for the inputs and outputs of `$signed_name`
         $($unsigned_attr:meta),*; // attributes for the unsigned function
@@ -12,7 +12,10 @@ macro_rules! impl_binary_long {
         /// tuple.
         ///
         /// This uses binary long division with no calls to smaller divisions, and is designed for
-        /// CPUs without fast division hardware.
+        /// CPUs without fast division hardware. The algorithm used is designed for architectures
+        /// without predicated instructions. If more performance is wanted for a predicated
+        /// architecture, a custom assembly routine using one of the algorithms described in the
+        /// documentation of this function should be used instead.
         ///
         /// # Panics
         ///
@@ -22,7 +25,7 @@ macro_rules! impl_binary_long {
         )*
         pub fn $unsigned_name(duo: $uX, div: $uX) -> ($uX, $uX) {
             if div == 0 {
-                panic!("division by zero")
+                panic!("attempt to divide by zero")
             }
             if duo < div {
                 return (0, duo)
@@ -80,7 +83,7 @@ macro_rules! impl_binary_long {
             //             - __________
             //          sub: 0b11111111
             // sub is negative, so decrease the shift, otherwise keep the shift the same.
-            //
+            /*
             let mut level = $n / 4;
             let mut shift = $n / 2;
             let mut duo = duo;
@@ -93,7 +96,9 @@ macro_rules! impl_binary_long {
                     // shift is too low
                     shift += level;
                 }
-                if level == 1 {
+                // narrow down bisection
+                level >>= 1;
+                if level == 0 {
                     // final step
                     let sub = (duo >> shift).wrapping_sub(div);
                     // if `(sub as $iX) < 0`, it involves cases where sub is smaller than `div`
@@ -109,7 +114,7 @@ macro_rules! impl_binary_long {
                     //          sub: 0b00000000
                     // the problem with this is that `duo >> shift` is shifting off a set bit
                     // that makes `duo >= 2*(div << shift)`, which would break binary division steps
-                    // assuming normalization, but this cannot happen with `sub < 0`.
+                    // that assume normalization, but this cannot happen with `sub < 0`.
                     //
                     // If `(sub as $iX) >= 0`, it involves cases where `sub >= div` when the most
                     // significant bits are aligned. We know that the current shift is the smaller
@@ -121,10 +126,29 @@ macro_rules! impl_binary_long {
                         break
                     }
                 }
-                // narrow down bisection
-                level >>= 1;
             }
-            
+            */
+
+            let mut level = $n / 4;
+            let mut shift = $n / 2;
+            let mut duo = duo;
+            // this macro unrolls the algorithm and compilers can easily propogate constants
+            repeat_log!($n, {
+                let sub = (duo >> shift).wrapping_sub(div);
+                if (sub as $iX) < 0 {
+                    shift -= level;
+                } else {
+                    shift += level;
+                }
+                level >>= 1;
+                if level == 0 {
+                    let sub = (duo >> shift).wrapping_sub(div);
+                    if (sub as $iX) < 0 {
+                        shift -= 1;
+                    }
+                }
+            });
+
             // There are many variations of binary division algorithm that could be used. This
             // documentation gives a tour of different methods so that future readers wanting to
             // optimize further do not have to painstakingly derive them. The SWAR variation is
@@ -191,7 +215,7 @@ macro_rules! impl_binary_long {
             loop {
                 let sub = duo.wrapping_sub(div);
                 // it is recommended to use `println!`s like this if functionality is unclear
-                //println!("duo:{:08b}, div:{:08b}, sub:{:08b}, shift:{}", duo, div, sub, shift);
+                //println!("duo:{:08b}, div:{:08b}, sub:{:08b}, quo:{:08b}, shift:{}", duo, div, sub, quo, shift);
                 if (sub as $iX) >= 0 {
                     duo = sub;
                     quo |= 1;
@@ -219,8 +243,8 @@ macro_rules! impl_binary_long {
             // `duo < div_original` check can be used in place of the `shift == 0` check, and `pow`
             // can be shifted right instead of needing to recalculate it from `1 << shift`, so
             // `shift` can be removed entirely. The following algorithm is the fastest restoring
-            // division algorithm that does not rely on carry flags or add-with-carry.
-
+            // division algorithm that does not rely on carry flags, add-with-carry, or SWAR
+            // complications.
             /*
             // Perform one binary long division step on the already normalized arguments, and setup
             // all the variables.
@@ -247,22 +271,6 @@ macro_rules! impl_binary_long {
                 div >>= 1;
             }
             */
-
-            // There is a way to do restoring binary long division without branching or predication,
-            // but it requires about 4 extra operations (smearing the sign bit, negating the mask,
-            // and applying the mask twice):
-            //
-            // (example of central loop)
-            // let sub = duo.wrapping_sub(div);
-            // let sign_mask = !(((sub as $iX) >> ($n - 1)) as $uX);
-            // duo -= div & sign_mask;
-            // quo |= sign_mask & pow;
-            //
-            // This might be better on CPUs with incredibly long pipelines, but the smaller CPUs
-            // that need software division probably do not have the 8 cycle branch miss penalties
-            // needed to break even (assuming that a branch miss occurs on half of steps). Branches
-            // would still need to be inserted at regular intervals to make sure exact divisions are
-            // fast.
 
             // If the architecture has flags and predicated arithmetic instructions, it is possible
             // to do binary long division without branching and in only 3 or 4 instructions. This is
@@ -331,17 +339,154 @@ macro_rules! impl_binary_long {
             return (quo, duo >> shift);
             */
 
+            // This is the SWAR (SIMD within in a register) binary long division algorithm.
+            // This combines several ideas of the above algorithms:
+            //  - If `duo` is shifted left instead of shifting `div` right like in the 3 instruction
+            //    restoring division algorithm, some architectures can do the shifting and
+            //    subtraction step in one instruction.
+            //  - `quo` can be constructed by adding powers-of-two to it or shifting it left by one
+            //    and adding one.
+            //  - Every time `duo` is shifted left, there is another unused 0 bit shifted into the
+            //    LSB, so what if we use those bits to store `quo`?
+            // Through a complex setup, it is possible to manage `duo` and `quo` in the same
+            // register, and perform one step with 2 or 3 instructions. The only major downsides are
+            // that there is significant setup, `duo < div_original` checks are impractical once
+            // SWAR is initiated, and the number of division steps taken has to be exact.
+            /*
+            // first step. The quotient bit is stored in `quo` for now
+            let div_original = div;
+            let mut div: $uX = (div << shift);
+            duo = duo.wrapping_sub(div);
+            let mut quo: $uX = 1 << shift;
+            if duo < div_original {
+                return (quo, duo);
+            }
+
+            let mask: $uX;
+            if div >= (1 << ($n - 1)) {
+                // deal with same edge case as the 3 instruction restoring division algorithm, but
+                // the quotient bit from this step also has to be stored in `quo`
+                div >>= 1;
+                shift -= 1;
+                let tmp = 1 << shift;
+                mask = tmp - 1;
+                let sub = duo.wrapping_sub(div);
+                if (sub as $iX) >= 0 {
+                    // restore
+                    duo = sub;
+                    quo |= tmp;
+                }
+                if duo < div_original {
+                    return (quo, duo);
+                }
+            } else {
+                mask = quo - 1;
+            }
+            // There is now room for quotient bits in `duo`.
+
+            // When subtracted from `duo.wrapping_shl(1)`, this adds a quotient bit to the least
+            // significant bit. When added to `duo`, it subtracts away the quotient bit.
+            let div: $uX = div.wrapping_sub(1);
+            // comment out the for loop and uncomment the other lines of code to enable unrolling
+            //let mut i = shift as isize;
+            //unroll!($n, i, {
+            for _ in 0..shift {
+                duo = duo.wrapping_shl(1).wrapping_sub(div);
+                if (duo as $iX) < 0 {
+                    duo = duo.wrapping_add(div);
+                }
+            }
+            //});
+            return ((duo & mask) | quo, duo >> shift);
+            */
+
+            // The problem with the conditional restoring SWAR algorithm above is that it requires
+            // assembly code to bring out its full unrolled potential. On architectures without
+            // predicated instructions, the code gen is especially bad. We need a default software
+            // division algorithm that is guaranteed to get good code gen for the central loop.
+
+            // For non-SWAR algorithms, there is a way to do binary long division without
+            // predication or even branching. This involves creating a mask from the sign bit and
+            // performing different kinds of steps using that.
+            //
+            // (example of a step for a branchless restoring algorithm with no need for predication)
+            // let sub = duo.wrapping_sub(div);
+            // let sign_mask = !(((sub as $iX).wrapping_shr($n - 1)) as $uX);
+            // duo -= div & sign_mask;
+            // quo |= sign_mask & pow;
+            //
+            // However, it requires about 4 extra operations (smearing the sign bit, negating the
+            // mask, and applying the mask twice) on top of the operations done by the actual
+            // algorithm. With SWAR however, just 2 extra operations are needed, making it
+            // practical and even the most optimal algorithm for some architectures.
+            //
+            // duo = duo.wrapping_shl(1).wrapping_sub(div);
+            // let mask = (duo as $iX).wrapping_shr($n - 1) as $uX;
+            // duo = duo.wrapping_add(div & mask);
+            //
+            // What we do is use custom assembly for predicated architectures that need software
+            // division, and for the default algorithm use a mask based restoring SWAR algorithm
+            // without conditionals or branches. On almost all architectures, this Rust code is
+            // guaranteed to compile down to 5 assembly instructions or less for each step, along
+            // with a small amount of branching overhead to get the exact number of steps required.
+            // The `unroll!` macro has similar performance to Duff's device, without requiring
+            // compilers to be smart enough to use variable assembly jumps.
+
+            // standard opening for SWAR algorithm with first step and edge case handling
+            let div_original = div;
+            let mut div: $uX = (div << shift);
+            duo = duo.wrapping_sub(div);
+            let mut quo: $uX = 1 << shift;
+            if duo < div_original {
+                return (quo, duo);
+            }
+            let mask: $uX;
+            if div >= (1 << ($n - 1)) {
+                div >>= 1;
+                shift -= 1;
+                let tmp = 1 << shift;
+                mask = tmp - 1;
+                let sub = duo.wrapping_sub(div);
+                if (sub as $iX) >= 0 {
+                    duo = sub;
+                    quo |= tmp;
+                }
+                if duo < div_original {
+                    return (quo, duo);
+                }
+            } else {
+                mask = quo - 1;
+            }
+
+            div = div.wrapping_sub(1);
+            // central loop with unrolling
+            let mut i = shift;
+            unroll!($n, i, {
+            // for _ in 0..shift {
+                duo = duo.wrapping_shl(1).wrapping_sub(div);
+                let mask = (duo as $iX).wrapping_shr($n - 1) as $uX;
+                duo = duo.wrapping_add(div & mask);
+            // }
+            });
+            return ((duo & mask) | quo, duo >> shift);
+
+            // miscellanious binary long division algorithms that might be better for specific
+            // architectures
+
             // Another kind of long division uses an interesting fact that `div` and `pow` can be
             // negated when `duo` is negative to perform a "negated" division step that works in
             // place of any normalization mechanism. This is a non-restoring division algorithm that
             // is very similar to the non-restoring division algorithms that can be found on the
-            // internet, except there is only one test for `duo < 0`.
+            // internet, except there is only one test for `duo < 0`. The subtraction from `quo` can
+            // be viewed as shifting the least significant set bit right (e.x. if we enter a series
+            // of negated binary long division steps starting with `quo == 0b1011_0000` and
+            // `pow == 0b0000_1000`, `quo` will progress like this: 0b1010_1000, 0b1010_0100,
+            // 0b1010_0010, 0b1010_0001).
             /*
             let div_original = div;
             let mut div: $uX = (div << shift);
             let mut pow: $uX = 1 << shift;
             let mut quo: $uX = pow;
-
             duo = duo.wrapping_sub(div);
             if duo < div_original {
                 return (quo, duo);
@@ -356,7 +501,7 @@ macro_rules! impl_binary_long {
                     pow >>= 1;
                     div >>= 1;
                 } else {
-                    // Regular long division step.
+                    // Normal long division step.
                     if duo < div_original {
                         return (quo, duo)
                     }
@@ -368,37 +513,25 @@ macro_rules! impl_binary_long {
             }
             */
 
-            // This final variation is the SWAR (SIMD within in a register) binary long division
-            // algorithm. This combines several ideas of the above algorithms:
-            //  - If `duo` is shifted left instead of shifting `div` right like in the 3 instruction
-            //    restoring division algorithm, some architectures can do the shifting and
-            //    subtraction step in one instruction.
-            //  - `quo` can be constructed by adding powers-of-two to it, shifting
-            //    it left by one and adding one, or shifting left and subtracting one in a
-            //    non-restoring step.
-            //  - The non-restoring division algorithm is very symmetric when adding and subtracting
-            //    to `duo` in quo`.
-            //  - Every time `duo` is shifted left, there is another unused 0 bit shifted into the
-            //    LSB, so what if we use those bits to store `quo`?
-            // Through a complex setup, it is possible to manage `duo` and `quo` in the same
-            // register, and perform one step with one instruction. Even better, add-with-carry is
-            // not needed. The only major downsides are that `duo < div_original` checks are
-            // impractical, and the number of division steps taken has to be exact.
-
+            // The most promising division algorithm combines the nonrestoring algorithm above with
+            // SWAR techniques that makes the only difference between steps be negation of `div`.
+            // If there was an architecture with an instruction that negated inputs to an adder
+            // based on conditionals, and in place shifting (or a three input addition operation
+            // that can have `duo` as two of the inputs to effectively shift it left by 1), then a
+            // single instruction central loop is possible. Microarchitectures often have inputs to
+            // their ALU that can invert the arguments and carry in of adders, but the architectures
+            // unfortunately do not have an instruction to dynamically invert this input based on
+            // conditionals.
+            /*
             let div_original = div;
             let mut div: $uX = (div << shift);
             duo = duo.wrapping_sub(div);
-            // Until `duo` has been shifted left, there is no room for quotient bits in `duo`, so
-            // we store the bits here and add them on at the end.
             let mut quo: $uX = 1 << shift;
             if duo < div_original {
                 return (quo, duo);
             }
-
             let mask: $uX;
             if div >= (1 << ($n - 1)) {
-                // deal with same edge case as the 3 instruction restoring division algorithm, but
-                // the quotient bit from this step has to be stored in `quo`
                 div >>= 1;
                 shift -= 1;
                 let tmp = 1 << shift;
@@ -408,7 +541,6 @@ macro_rules! impl_binary_long {
                     duo = sub;
                     quo |= tmp;
                 }
-                // need this so that a check at the beginning of loops is not needed
                 if duo < div_original {
                     return (quo, duo);
                 }
@@ -416,18 +548,17 @@ macro_rules! impl_binary_long {
             } else {
                 mask = quo - 1;
             }
-
             // the subtracted one acts as a negative one for the quotient inside `duo`
             let div: $uX = div.wrapping_sub(1);
             let mut i = 0;
             loop {
-                // note: the `duo.wrapping_shl(1)` cannot be factored out because it would require
-                // another restoring division step to prevent `(duo as $iX)` from overflowing
+                // note: the `wrapping_shl(1)` can be factored out, but would require another
+                // restoring division step to prevent `(duo as $iX)` from overflowing
                 if (duo as $iX) < 0 {
                     // Negated binary long division step.
                     duo = duo.wrapping_shl(1).wrapping_add(div);
                 } else {
-                    // Regular long division step.
+                    // Normal long division step.
                     duo = duo.wrapping_shl(1).wrapping_sub(div);
                 }
                 i += 1;
@@ -436,19 +567,22 @@ macro_rules! impl_binary_long {
                 }
             }
             if (duo as $iX) < 0 {
-                // Extra negated binary long division step. This is not needed in the original
-                // nonrestoring algorithm because of the `duo < div_original` checks
+                // Restore. This was not needed in the original nonrestoring algorithm because of
+                // the `duo < div_original` checks.
                 duo = duo.wrapping_add(div);
             }
-
             return ((duo & mask) | quo, duo >> shift);
+            */
         }
 
         /// Computes the quotient and remainder of `duo` divided by `div` and returns them as a
         /// tuple.
         ///
         /// This uses binary long division with no calls to smaller divisions, and is designed for
-        /// CPUs without fast division hardware.
+        /// CPUs without fast division hardware. The algorithm used is designed for architectures
+        /// without predicated instructions. If more performance is wanted for a predicated
+        /// architecture, a custom assembly routine using one of the algorithms described in the
+        /// documentation of this function should be used instead.
         ///
         /// # Panics
         ///

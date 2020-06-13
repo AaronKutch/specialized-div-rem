@@ -24,5 +24,6 @@ std = []
 rand = "0.7"
 
 [profile.test]
-# testing with `opt-level = 0` optimization is completely impractical
+# testing with `opt-level = 0` optimization is completely impractical, only change if backtraces are
+# not working
 opt-level = 2

@@ -50,7 +50,7 @@ macro_rules! impl_asymmetric {
             let div_hi = (div >> n) as $uX;
             if div_hi == 0 {
                 if div_lo == 0 {
-                    panic!("division by zero");
+                    panic!("attempt to divide by zero");
                 }
                 if duo_hi < div_lo {
                     // plain $uD by $uX division that will fit into $uX
