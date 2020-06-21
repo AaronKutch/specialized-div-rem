@@ -2,6 +2,7 @@ macro_rules! impl_binary_long {
     (
         $unsigned_name:ident, // name of the unsigned division function
         $signed_name:ident, // name of the signed division function
+        $normalization_shift:ident, // function for finding the normalization shift
         $n:tt, // the number of bits in a $iX or $uX
         $uX:ident, // unsigned integer type for the inputs and outputs of `$unsigned_name`
         $iX:ident, // signed integer type for the inputs and outputs of `$signed_name`
@@ -24,130 +25,18 @@ macro_rules! impl_binary_long {
             #[$unsigned_attr]
         )*
         pub fn $unsigned_name(duo: $uX, div: $uX) -> ($uX, $uX) {
+            // handle edge cases before finding the normalization shift
             if div == 0 {
                 panic!("attempt to divide by zero")
             }
             if duo < div {
                 return (0, duo)
             }
-            // This eliminates cases where the most significant bit of `div` is set. Signed
-            // comparisons can then be used to determine overflow without needing carry flags.
             if (duo - div) < div {
                 return (1, duo - div)
             }
-
-            // We have to find the leading zeros of `div` to know where its most significant bit
-            // it to even begin binary long division. It is also good to know where the most
-            // significant bit of `duo` is so that useful work can be started instead of shifting
-            // `div` for all possible quotients (many division steps are wasted if
-            // `duo.leading_zeros()` is large and `div` starts out being shifted all the way to the
-            // most significant bit). Aligning the most significant bit of `div` and `duo` could be
-            // done by shifting `div` left by `div.leading_zeros() - duo.leading_zeros()`, but many
-            // CPUs without division hardware also do not have single instructions for calculating
-            // `leading_zeros`. Instead of software doing two bisections to find the two
-            // `leading_zeros`, we do one bisection to find
-            // `div.leading_zeros() - duo.leading_zeros()` without actually knowing either of the
-            // leading zeros values.
-
-            // If we shift `duo` right and subtract `div` from the shifted value and the result is
-            // negative, then the most significant bit of `duo` is even with or has passed the most
-            // significant bit of `div` and the shift can be decreased. Otherwise, the most
-            // significant bit of `duo` has not passed that of `div` and the shift can be increased.
-            //
-            // Example: finding the aligning shift for dividing 178u8 (0b10110010) by 6u8 (0b110)
-            // first loop:
-            // level: 2, shift: 4
-            // duo >> shift: 0b00001011
-            //          div: 0b00000110
-            //             - __________
-            //          sub: 0b00000101
-            // sub is positive, so increase the shift amount by the current level of bisection.
-            // second loop:
-            // level: 1, shift: 6
-            // duo >> shift: 0b00000010
-            //          div: 0b00000110
-            //             - __________
-            //          sub: 0b11111100
-            // sub is negative, so decrease the shift.
-            //
-            // The tricky part is when the significant bits are even with each other. In that case,
-            // `duo.wrapping_sub(div)` could be positive or negative and this algorithm falls into a
-            // repeating cycle between two values of `shift` (in this case, it will cycle between
-            // shifts of 4 and 5). The smaller of the two shift values turns out to always be valid
-            // for starting long division.
-            //
-            // (the last step uses `level = 1` again)
-            // level: 1, shift: 5
-            // duo >> shift: 0b00000101
-            //          div: 0b00000110
-            //             - __________
-            //          sub: 0b11111111
-            // sub is negative, so decrease the shift, otherwise keep the shift the same.
-            /*
-            let mut level = $n / 4;
-            let mut shift = $n / 2;
             let mut duo = duo;
-            loop {
-                let sub = (duo >> shift).wrapping_sub(div);
-                if (sub as $iX) < 0 {
-                    // shift is too high
-                    shift -= level;
-                } else {
-                    // shift is too low
-                    shift += level;
-                }
-                // narrow down bisection
-                level >>= 1;
-                if level == 0 {
-                    // final step
-                    let sub = (duo >> shift).wrapping_sub(div);
-                    // if `(sub as $iX) < 0`, it involves cases where sub is smaller than `div`
-                    // when the most significant bits are aligned, like in the example above.
-                    // Then, we can immediately do a long division step without needing a
-                    // normalization check. There is an edge case we avoid by using a `sub < 0`
-                    // comparison rather than a `sub <= 0` comparison on the branch:
-                    // if duo = 0b1001 and div = 0b0100, we could arrive to this branch with
-                    // shift: 1
-                    // duo >> shift: 0b00000100
-                    //          div: 0b00000100
-                    //             - __________
-                    //          sub: 0b00000000
-                    // the problem with this is that `duo >> shift` is shifting off a set bit
-                    // that makes `duo >= 2*(div << shift)`, which would break binary division steps
-                    // that assume normalization, but this cannot happen with `sub < 0`.
-                    //
-                    // If `(sub as $iX) >= 0`, it involves cases where `sub >= div` when the most
-                    // significant bits are aligned. We know that the current shift is the smaller
-                    // shift in the cycle and can automatically be part of a long division step.
-                    if (sub as $iX) < 0 {
-                        shift -= 1;
-                        break
-                    } else {
-                        break
-                    }
-                }
-            }
-            */
-
-            let mut level = $n / 4;
-            let mut shift = $n / 2;
-            let mut duo = duo;
-            // this macro unrolls the algorithm and compilers can easily propogate constants
-            repeat_log!($n, {
-                let sub = (duo >> shift).wrapping_sub(div);
-                if (sub as $iX) < 0 {
-                    shift -= level;
-                } else {
-                    shift += level;
-                }
-                level >>= 1;
-                if level == 0 {
-                    let sub = (duo >> shift).wrapping_sub(div);
-                    if (sub as $iX) < 0 {
-                        shift -= 1;
-                    }
-                }
-            });
+            let mut shift: usize = $normalization_shift(duo, div);
 
             // There are many variations of binary division algorithm that could be used. This
             // documentation gives a tour of different methods so that future readers wanting to
@@ -460,7 +349,7 @@ macro_rules! impl_binary_long {
 
             div = div.wrapping_sub(1);
             // central loop with unrolling
-            let mut i = shift;
+            let mut i = shift as isize;
             unroll!($n, i, {
             // for _ in 0..shift {
                 duo = duo.wrapping_shl(1).wrapping_sub(div);

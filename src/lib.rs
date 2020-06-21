@@ -107,6 +107,12 @@ unsafe fn u128_by_u64_div_rem(duo: u128, div: u64) -> (u64, u64) {
     (quo, rem)
 }
 
+// note: there are some architecture dependent `#[cfg(...)]`s in the macro
+impl_normalization_shift!(u8_normalization_shift, 8, u8, i8, inline);
+impl_normalization_shift!(u16_normalization_shift, 16, u16, i16, inline);
+impl_normalization_shift!(u32_normalization_shift, 32, u32, i32, inline);
+impl_normalization_shift!(u64_normalization_shift, 64, u64, i64, inline);
+
 // Note: one reason for the macros having a `$half_division:ident` instead of directly calling the
 // `/` and `%` builtin operators is that allows using different algorithms for the half
 // division instead of just the default.
@@ -126,6 +132,7 @@ unsafe fn u128_by_u64_div_rem(duo: u128, div: u64) -> (u64, u64) {
 impl_binary_long!(
     u8_div_rem_binary_long,
     i8_div_rem_binary_long,
+    u8_normalization_shift,
     8,
     u8,
     i8,
@@ -145,6 +152,7 @@ test!(
 impl_binary_long!(
     u16_div_rem_binary_long,
     i16_div_rem_binary_long,
+    u16_normalization_shift,
     16,
     u16,
     i16,
@@ -164,6 +172,7 @@ test!(
 impl_binary_long!(
     u32_div_rem_binary_long,
     i32_div_rem_binary_long,
+    u32_normalization_shift,
     32,
     u32,
     i32,
@@ -198,6 +207,7 @@ test!(
 impl_binary_long!(
     u64_div_rem_binary_long,
     i64_div_rem_binary_long,
+    u64_normalization_shift,
     64,
     u64,
     i64,

@@ -18,6 +18,8 @@ default = ["asm", "std"]
 asm = []
 # this is needed for benchmarks and the `println!` in tests
 std = []
+# for testing purposes
+force_software_normalization = []
 
 [dev-dependencies]
 # for random numbers in benchmarks
