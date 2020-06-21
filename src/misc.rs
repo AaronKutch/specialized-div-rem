@@ -261,6 +261,7 @@ macro_rules! unroll {
 macro_rules! impl_normalization_shift {
     (
         $name:ident, // name of the normalization shift function
+        $softnorm:ident, // boolean for if software normalization should be used
         $n:tt, // the number of bits in a $iX or $uX
         $uX:ident, // unsigned integer type for the inputs of `$name`
         $iX:ident, // signed integer type for the inputs of `$name`
@@ -382,9 +383,7 @@ macro_rules! impl_normalization_shift {
             }
             */
 
-            // Architectures without hardware division or `usize::leading_zeros` support
-            #[cfg(any(feature = "force_software_normalization", target_arch = "riscv32i", target_arch = "thumbv6m"))]
-            {
+            if $softnorm {
                 let mut level: usize = $n / 4;
                 let mut shift: usize = $n / 2;
                 // this macro unrolls the algorithm and compilers can easily propogate constants
@@ -402,10 +401,7 @@ macro_rules! impl_normalization_shift {
                     }
                 });
                 shift
-            }
-
-            #[cfg(not(any(feature = "force_software_normalization", target_arch = "riscv32i", target_arch = "thumbv6m")))]
-            {
+            } else {
                 let mut shift = (div.leading_zeros() - duo.leading_zeros()) as usize;
                 if duo < (div << shift) {
                     shift -= 1;

@@ -303,11 +303,25 @@ unsafe fn u128_by_u64_div_rem(duo: u128, div: u64) -> (u64, u64) {
     (quo, rem)
 }
 
-// note: there are some architecture dependent `#[cfg(...)]`s in the macro
-impl_normalization_shift!(u8_normalization_shift, 8, u8, i8, inline);
-impl_normalization_shift!(u16_normalization_shift, 16, u16, i16, inline);
-impl_normalization_shift!(u32_normalization_shift, 32, u32, i32, inline);
-impl_normalization_shift!(u64_normalization_shift, 64, u64, i64, inline);
+// For architectures without hardware division or `usize::leading_zeros` support
+#[cfg(any(
+    feature = "force_software_normalization",
+    target_arch = "riscv32i",
+    target_arch = "thumbv6m"
+))]
+const SOFTNORM: bool = true;
+
+#[cfg(not(any(
+    feature = "force_software_normalization",
+    target_arch = "riscv32i",
+    target_arch = "thumbv6m"
+)))]
+const SOFTNORM: bool = false;
+
+impl_normalization_shift!(u8_normalization_shift, SOFTNORM, 8, u8, i8, inline);
+impl_normalization_shift!(u16_normalization_shift, SOFTNORM, 16, u16, i16, inline);
+impl_normalization_shift!(u32_normalization_shift, SOFTNORM, 32, u32, i32, inline);
+impl_normalization_shift!(u64_normalization_shift, SOFTNORM, 64, u64, i64, inline);
 
 // Note: one reason for the macros having a `$half_division:ident` instead of directly calling the
 // `/` and `%` builtin operators is that allows using different algorithms for the half
