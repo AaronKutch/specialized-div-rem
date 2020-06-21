@@ -7,6 +7,18 @@ use test::{black_box, Bencher};
 extern crate specialized_div_rem;
 use specialized_div_rem::*;
 
+#[bench]
+fn usize_leading_zeros(bencher: &mut Bencher) {
+    let v: Vec<usize> = black_box({
+        let mut v = Vec::new();
+        for _ in 0..32 {
+            v.push(random::<usize>() >> (random::<u32>() % usize::MAX.count_ones()));
+        }
+        v
+    });
+    bencher.iter(|| v.iter().fold(0, |s, x| s + leading_zeros(*x)))
+}
+
 // whatever Rust is using for the `/` and `%` operators
 pub fn u32_div_rem_std(duo: u32, div: u32) -> (u32, u32) {
     (duo / div, duo % div)

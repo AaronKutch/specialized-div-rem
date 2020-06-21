@@ -117,8 +117,7 @@ macro_rules! impl_asymmetric {
             } else {
                 // This has been adapted from
                 // https://www.codeproject.com/tips/785014/uint-division-modulus which was in turn
-                // adapted from www.hackersdelight.org (which, as of writing, unfortunately seems to
-                // no longer exist).
+                // adapted from Hacker's Delight.
 
                 // This is similar to the `mul` or `mul - 1` algorithm in that it uses only more
                 // significant parts of `duo` and `div` to divide a large integer with a smaller
