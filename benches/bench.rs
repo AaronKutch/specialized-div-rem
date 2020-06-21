@@ -7,12 +7,14 @@ use test::{black_box, Bencher};
 extern crate specialized_div_rem;
 use specialized_div_rem::*;
 
+/// Calculates `specialized_div_rem::leading_zeros` 32 times with randomized operands with a random
+/// number of leading zeros
 #[bench]
 fn usize_leading_zeros(bencher: &mut Bencher) {
     let v: Vec<usize> = black_box({
         let mut v = Vec::new();
         for _ in 0..32 {
-            v.push(random::<usize>() >> (random::<u32>() % usize::MAX.count_ones()));
+            v.push(random::<usize>() & (usize::MAX >> (random::<u32>() % usize::MAX.count_ones())));
         }
         v
     });
@@ -33,38 +35,32 @@ pub fn i128_div_rem_std(duo: i128, div: i128) -> (i128, i128) {
     (duo / div, duo % div)
 }
 
-enum FnKind {
-    DivRem,
-    Div,
-    Rem,
-}
-
-/// This macro can create multiple benchmarking functions that run 32 random integers through a
-/// division function. Two masks are applied to `duo` and `div` for testing different ranges of
-/// integers.
+/// This macro can create multiple benchmarking functions that run 8 pairs of random integers
+/// through a division function. Two masks are applied to `duo` and `div` for testing different
+/// ranges of integers.
 macro_rules! bencher {
     (
-        $fn_kind:expr, // kind of operation
-        $ty:tt, // the type that is entered into the operations
+        // the type that is entered into the operations
+        $ty:tt,
         // the size of the mask that is applied to a random number to make the dividend
         $arg0_sb:expr,
-        // Note: argument 1 is set to 1 if the random number generator returns zero
         // the size of the mask that is applied to a random number to make the divisor
+        // Note: the divisor is set to 1 if the random number generator returns zero
         $arg1_sb:expr,
-        // name of division function and corresponding test
+        // name of division function used and corresponding test
         $($fn_div_rem:ident, $test_name:ident);+;
     ) => {
         $(
             #[bench]
             fn $test_name(bencher: &mut Bencher) {
                 let (a, b) = black_box({
-                    let bits = std::$ty::MAX.count_ones();
+                    let n = std::$ty::MAX.count_ones();
                     let (mut a, mut b): (Vec<$ty>, Vec<$ty>) = (Vec::new(), Vec::new());
-                    for _ in 0..32 {
+                    for _ in 0..8 {
                         let tmp0: $ty = random();
-                        a.push(tmp0 & ($ty::MAX >> (bits - $arg0_sb)));
+                        a.push(tmp0 & ($ty::MAX >> (n - $arg0_sb)));
                         let tmp1: $ty = random();
-                        let tmp1 = tmp1 & ($ty::MAX >> (bits - $arg1_sb));
+                        let tmp1 = tmp1 & ($ty::MAX >> (n - $arg1_sb));
                         if tmp1 == 0 {
                             // avoid division by zero
                             b.push(1);
@@ -77,24 +73,10 @@ macro_rules! bencher {
                 bencher.iter(|| {
                     let mut s0 = 0;
                     let mut s1 = 0;
-                    match $fn_kind {
-                        FnKind::DivRem => {
-                            for i in 0..a.len() {
-                                let tmp = $fn_div_rem(a[i], b[i]);
-                                s0 += tmp.0;
-                                s1 += tmp.1;
-                            }
-                        }
-                        FnKind::Div => {
-                            for i in 0..a.len() {
-                                s0 += $fn_div_rem(a[i], b[i]).0;
-                            }
-                        }
-                        FnKind::Rem => {
-                            for i in 0..a.len() {
-                                s1 += $fn_div_rem(a[i], b[i]).1;
-                            }
-                        }
+                    for i in 0..a.len() {
+                        let tmp = $fn_div_rem(a[i], b[i]);
+                        s0 += tmp.0;
+                        s1 += tmp.1;
                     }
                     (s0, s1)
                 })
@@ -105,7 +87,6 @@ macro_rules! bencher {
 
 // These simulate the most common cases
 bencher!(
-    FnKind::DivRem,
     u32,
     24,
     20,
@@ -115,7 +96,6 @@ bencher!(
     u32_div_rem_24_20_binary_long;
 );
 bencher!(
-    FnKind::DivRem,
     u32,
     24,
     8,
@@ -125,7 +105,6 @@ bencher!(
     u32_div_rem_24_8_binary_long;
 );
 bencher!(
-    FnKind::DivRem,
     u32,
     32,
     16,
@@ -134,31 +113,8 @@ bencher!(
     u32_div_rem_binary_long,
     u32_div_rem_32_16_binary_long;
 );
-// Div only
-bencher!(
-    FnKind::Div,
-    u32,
-    32,
-    16,
-    u32_div_rem_std,
-    u32_div_32_16_std;
-    u32_div_rem_binary_long,
-    u32_div_32_16_binary_long;
-);
-// Rem only
-bencher!(
-    FnKind::Rem,
-    u32,
-    32,
-    16,
-    u32_div_rem_std,
-    u32_rem_32_16_std;
-    u32_div_rem_binary_long,
-    u32_rem_32_16_binary_long;
-);
 
 bencher!(
-    FnKind::DivRem,
     u64,
     48,
     38,
@@ -174,7 +130,6 @@ bencher!(
     u64_div_rem_48_38_trifecta;
 );
 bencher!(
-    FnKind::DivRem,
     u64,
     48,
     16,
@@ -190,7 +145,6 @@ bencher!(
     u64_div_rem_48_16_trifecta;
 );
 bencher!(
-    FnKind::DivRem,
     u64,
     64,
     32,
@@ -207,7 +161,6 @@ bencher!(
 );
 
 bencher!(
-    FnKind::DivRem,
     u128,
     96,
     70,
@@ -221,7 +174,6 @@ bencher!(
     u128_div_rem_96_70_trifecta;
 );
 bencher!(
-    FnKind::DivRem,
     u128,
     96,
     32,
@@ -234,9 +186,9 @@ bencher!(
     u128_div_rem_trifecta,
     u128_div_rem_96_32_trifecta;
 );
+
 // signed division
 bencher!(
-    FnKind::DivRem,
     i128,
     96,
     32,
@@ -250,7 +202,6 @@ bencher!(
     i128_div_rem_96_32_trifecta;
 );
 bencher!(
-    FnKind::DivRem,
     u128,
     128,
     64,
@@ -263,9 +214,9 @@ bencher!(
     u128_div_rem_trifecta,
     u128_div_rem_128_64_trifecta;
 );
+
 // 128 by 96
 bencher!(
-    FnKind::DivRem,
     u128,
     128,
     96,
@@ -278,9 +229,9 @@ bencher!(
     u128_div_rem_trifecta,
     u128_div_rem_128_96_trifecta;
 );
+
 // divisions with `duo` and `div` being very similar
 bencher!(
-    FnKind::DivRem,
     u128,
     120,
     120,
@@ -293,9 +244,9 @@ bencher!(
     u128_div_rem_trifecta,
     u128_div_rem_120_120_trifecta;
 );
+
 // bench short division by a very small div
 bencher!(
-    FnKind::DivRem,
     u128,
     128,
     8,

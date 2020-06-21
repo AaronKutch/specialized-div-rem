@@ -8,7 +8,7 @@ macro_rules! test {
         $iX:ident, // signed version of $uX
         // list of triples of the test name, the unsigned division function, and the signed
         // division function
-        $($test_name:ident, $unsigned_name:ident, $signed_name:ident);+
+        $($test_name:ident, $unsigned_name:ident, $signed_name:ident);+;
     ) => {
         $(
             #[test]
