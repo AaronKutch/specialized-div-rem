@@ -10,7 +10,7 @@ use specialized_div_rem::*;
 /// Calculates `specialized_div_rem::leading_zeros` 32 times with randomized operands with a random
 /// number of leading zeros
 #[bench]
-fn usize_leading_zeros(bencher: &mut Bencher) {
+fn usize_leading_zeros_random(bencher: &mut Bencher) {
     let v: Vec<usize> = black_box({
         let mut v = Vec::new();
         for _ in 0..32 {
@@ -18,7 +18,7 @@ fn usize_leading_zeros(bencher: &mut Bencher) {
         }
         v
     });
-    bencher.iter(|| v.iter().fold(0, |s, x| s + leading_zeros(*x)))
+    bencher.iter(|| v.iter().fold(0, |s, x| s + usize_leading_zeros(*x)))
 }
 
 // whatever Rust is using for the `/` and `%` operators

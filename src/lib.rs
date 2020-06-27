@@ -27,7 +27,7 @@ mod trifecta;
 #[macro_use]
 mod asymmetric;
 
-// `leading_zeros` would be placed in `misc.rs`, but has been placed here because we want to
+// `usize_leading_zeros` would be placed in `misc.rs`, but has been placed here because we want to
 // minimize changes to any of the files outside of `lib.rs` when copying and pasting to
 // `compiler-builtins`.
 
@@ -36,7 +36,7 @@ mod asymmetric;
 /// Counting leading zeros is performance critical to certain division algorithms and more. This is
 /// a fast software routine for CPU architectures without an assembly instruction to quickly
 /// calculate `leading_zeros`.
-pub const fn leading_zeros(x: usize) -> usize {
+pub const fn usize_leading_zeros(x: usize) -> usize {
     // Note: This routine produces the correct value for `x == 0`. Zero is probably common enough
     // that it could warrant adding a zero check at the beginning, but it was decided not to do
     // this. This code is meant to be the routine for `compiler-builtins` functions like `__clzsi2`
@@ -184,18 +184,18 @@ pub const fn leading_zeros(x: usize) -> usize {
     // We could potentially save a few cycles by using the LUT trick from
     // "https://embeddedgurus.com/state-space/2014/09/
     // fast-deterministic-and-portable-counting-leading-zeros/". 256 bytes for a LUT is too large,
-    // so we could perform bisection down to `((x >= (1 << 4)) as usize) << 2` and use this 16 byte LUT
-    // for the rest of the work.
+    // so we could perform bisection down to `((x >= (1 << 4)) as usize) << 2` and use this 16 byte
+    // LUT for the rest of the work:
     //const LUT: [u8; 16] = [0, 1, 2, 2, 3, 3, 3, 3, 4, 4, 4, 4, 4, 4, 4, 4];
     //z -= LUT[x] as usize;
     //z
-    // However, it ends up generating about the same amount of instructions. When benchmarked on
-    // x86_64, it is slightly faster to use the LUT, but I think this is only because of OOO
-    // execution effects. Changing to using a LUT and branching is risky for smaller cores.
+    // However, it ends up generating about the same number of instructions. When benchmarked on
+    // x86_64, it is slightly faster to use the LUT, but this is probably because of OOO execution
+    // effects. Changing to using a LUT and branching is risky for smaller cores.
 }
 
 #[test]
-fn leading_zeros_test() {
+fn usize_leading_zeros_test() {
     // binary fuzzer
     let mut x = 0usize;
     let mut ones: usize;
@@ -213,12 +213,12 @@ fn leading_zeros_test() {
                 (true, _) => x ^= mask,
             }
         }
-        if leading_zeros(x) != (x.leading_zeros() as usize) {
+        if usize_leading_zeros(x) != (x.leading_zeros() as usize) {
             panic!(
                 "x: {}, expected: {}, found: {}",
                 x,
                 x.leading_zeros(),
-                leading_zeros(x)
+                usize_leading_zeros(x)
             );
         }
     }
@@ -303,25 +303,18 @@ unsafe fn u128_by_u64_div_rem(duo: u128, div: u64) -> (u64, u64) {
     (quo, rem)
 }
 
-// For architectures without hardware division or `usize::leading_zeros` support
-#[cfg(any(
-    feature = "force_software_normalization",
-    target_arch = "riscv32i",
-    target_arch = "thumbv6m"
-))]
-const SOFTNORM: bool = true;
+// TODO: if Rust adds a way to check for the "B" extension on RISC-V, then modify this
+#[cfg(any(target_arch = "riscv32", target_arch = "riscv64"))]
+const USE_LZ: bool = false;
 
-#[cfg(not(any(
-    feature = "force_software_normalization",
-    target_arch = "riscv32i",
-    target_arch = "thumbv6m"
-)))]
-const SOFTNORM: bool = false;
+// The rest of the common architectures supply `leading_zeros`
+#[cfg(not(any(target_arch = "riscv32", target_arch = "riscv64")))]
+const USE_LZ: bool = true;
 
-impl_normalization_shift!(u8_normalization_shift, SOFTNORM, 8, u8, i8, inline);
-impl_normalization_shift!(u16_normalization_shift, SOFTNORM, 16, u16, i16, inline);
-impl_normalization_shift!(u32_normalization_shift, SOFTNORM, 32, u32, i32, inline);
-impl_normalization_shift!(u64_normalization_shift, SOFTNORM, 64, u64, i64, inline);
+impl_normalization_shift!(u8_normalization_shift, USE_LZ, 8, u8, i8, inline);
+impl_normalization_shift!(u16_normalization_shift, USE_LZ, 16, u16, i16, inline);
+impl_normalization_shift!(u32_normalization_shift, USE_LZ, 32, u32, i32, inline);
+impl_normalization_shift!(u64_normalization_shift, USE_LZ, 64, u64, i64, inline);
 
 // Note: one reason for the macros having a `$half_division:ident` instead of directly calling the
 // `/` and `%` builtin operators is that allows using different algorithms for the half

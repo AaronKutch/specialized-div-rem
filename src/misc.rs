@@ -128,150 +128,20 @@ macro_rules! test {
     }
 }
 
-/// Repeats a block of code `$b`. The number of repeats corresponds to `log2($n) - 1`, where `$n`
-/// is the power-of-two literal token. This is intended for unrolling bisection algorithms.
-// currently only used when impl_normalization_shift uses software implementation
-#[allow(unused_macros)]
-macro_rules! repeat_log {
-    (128, $b:block) => {
-        $b;
-        repeat_log!(64, $b);
-    };
-    (64, $b:block) => {
-        $b;
-        repeat_log!(32, $b);
-    };
-    (32, $b:block) => {
-        $b;
-        repeat_log!(16, $b);
-    };
-    (16, $b:block) => {
-        $b;
-        repeat_log!(8, $b);
-    };
-    (8, $b:block) => {
-        $b;
-        repeat_log!(4, $b);
-    };
-    (4, $b:block) => {
-        $b;
-    };
-}
-
-/// Unrolls a loop containing a block of code `$b`. `$i` should be a mutable `isize` set to the
-/// number of times the block of code should be run. NOTE: the state of `$i` is not guaranteed to be
-/// anything during and after execution of the code fed to this macro, so the variable designated
-/// by `$i` must not be used by the block of code or any code after the macro.
-///
-/// This macro called as `unroll!($n, $i, $b);` is equivalent to
-/// `
-/// // for _ in 0..$i {
-/// //     $b;
-/// // }
-/// `
-/// The power-of-two literal token does not effect the logic, but it does effect code size and
-/// performance.
-#[rustfmt::skip]
-macro_rules! unroll {
-    (128, $i:ident, $b:block) => {
-        // make sure that the type of `$i` coerces to `isize`, to prevent surprises
-        let _: isize = $i;
-        unroll!(64, $i, $b);
-    };
-    (64, $i:ident, $b:block) => {
-        let _: isize = $i;
-        unroll!(32, $i, $b);
-    };
-    (32, $i:ident, $b:block) => {
-        let _: isize = $i;
-        // Code gen is almost always too large to unroll 16 times or more. If the block consists of
-        // only one or two assembly instructions, it is probably better to code a custom assembly
-        // variable jump into an unrolled loop.
-        /*
-        loop {
-            $i -= 16;
-            if $i < 0 {
-                break;
-            }
-            $b;$b;$b;$b;$b;$b;$b;$b;$b;$b;$b;$b;$b;$b;$b;$b;
-        }
-        $i += 16;
-        if $i != 0 {
-            unroll!(16, $i, $b);
-        }
-        */
-        unroll!(16, $i, $b);
-    };
-    (16, $i:ident, $b:block) => {
-        let _: isize = $i;
-        // loop management is kept down to 2 instructions for each loop, plus 2 instructions for
-        // every change to a smaller unroll with this method.
-        loop {
-            $i -= 8;
-            if $i < 0 {
-                break;
-            }
-            $b;$b;$b;$b;$b;$b;$b;$b;
-        }
-        $i += 8;
-        // The check for zero is not required, but is a simple way to improve performance
-        if $i != 0 {
-            unroll!(8, $i, $b);
-        }
-    };
-    (8, $i:ident, $b:block) => {
-        let _: isize = $i;
-        loop {
-            $i -= 4;
-            if $i < 0 {
-                break;
-            }
-            $b;$b;$b;$b;
-        }
-        $i += 4;
-        if $i != 0 {
-            unroll!(4, $i, $b);
-        }
-    };
-    (4, $i:ident, $b:block) => {
-        let _: isize = $i;
-        loop {
-            $i -= 2;
-            if $i < 0 {
-                break;
-            }
-            $b;$b;
-        }
-        if $i == -1 {
-            $b;
-        }
-    };
-    (2, $i:ident, $b:block) => {
-        let _: isize = $i;
-        loop {
-            $i -= 1;
-            if $i < 0 {
-                break;
-            }
-            $b;
-        }
-    };
-}
-
 macro_rules! impl_normalization_shift {
     (
         $name:ident, // name of the normalization shift function
-        $softnorm:ident, // boolean for if software normalization should be used
+        // boolean for if `$uX::leading_zeros` should be used (if an architecture does not have a
+        // hardware instruction for `usize::leading_zeros`, then this should be `true`)
+        $use_lz:ident,
         $n:tt, // the number of bits in a $iX or $uX
         $uX:ident, // unsigned integer type for the inputs of `$name`
         $iX:ident, // signed integer type for the inputs of `$name`
         $($unsigned_attr:meta),* // attributes for the function
     ) => {
         /// Finds the shift left that the divisor `div` would need to be normalized for a binary
-        /// long division step with the dividend `duo`. This was designed for architectures without
-        /// assembly instructions to count the leading zeros of integers.
-        ///
-        /// NOTE: This function assumes that three edge cases have been handled before reaching it:
+        /// long division step with the dividend `duo`. NOTE: This function assumes that these edge
+        /// cases have been handled before reaching it:
         /// `
         /// if div == 0 {
         ///     panic!("attempt to divide by zero")
@@ -279,135 +149,86 @@ macro_rules! impl_normalization_shift {
         /// if duo < div {
         ///     return (0, duo)
         /// }
-        /// // This eliminates cases where the most significant bit of `div` is set. Signed
-        /// // comparisons (for architectures without flags) inside `normalization_shift` and code
-        /// // after it can then be used.
-        /// if (duo - div) < div {
-        ///     return (1, duo - div)
+        /// `
+        ///
+        /// Normalization is defined as (where `shl` is the output of this function):
+        /// `
+        /// if duo.leading_zeros() != (div << shl).leading_zeros() {
+        ///     // If the most significant bits of `duo` and `div << shl` are not in the same place,
+        ///     // then `div << shl` has one more leading zero than `duo`.
+        ///     assert_eq!(duo.leading_zeros() + 1, (div << shl).leading_zeros());
+        ///     // Also, `2*(div << shl)` is not more than `duo` (otherwise the first division step
+        ///     // would not be able to clear the msb of `duo`)
+        ///     assert!(duo < (div << (shl + 1)));
+        /// }
+        /// if full_normalization {
+        ///     // Some algorithms do not need "full" normalization, which means that `duo` is
+        ///     // larger than `div << shl` when the most significant bits are aligned.
+        ///     assert!((div << shl) <= duo);
         /// }
         /// `
+        ///
+        /// Note: If the software bisection algorithm is being used in this function, it happens
+        /// that full normalization always occurs, so be careful that new algorithms are not
+        /// invisibly depending on this invariant when `full_normalization` is set to `false`.
         $(
             #[$unsigned_attr]
         )*
-        fn $name(duo: $uX, div: $uX) -> usize {
-            // We have to find the leading zeros of `div` to know where its most significant bit
-            // is to even begin binary long division. It is also good to know where the most
-            // significant bit of `duo` is so that useful work can be started instead of shifting
-            // `div` for all possible quotients (many division steps are wasted if
-            // `duo.leading_zeros()` is large and `div` starts out being shifted all the way to the
-            // most significant bit). Aligning the most significant bit of `div` and `duo` could be
-            // done by shifting `div` left by `div.leading_zeros() - duo.leading_zeros()`, but some
-            // CPUs without division hardware also do not have single instructions for calculating
-            // `leading_zeros`. Instead of software doing two bisections to find the two
-            // `leading_zeros`, we do one bisection to find
-            // `div.leading_zeros() - duo.leading_zeros()` without actually knowing either of the
-            // leading zeros values.
+        fn $name(duo: $uX, div: $uX, full_normalization: bool) -> usize {
+            // We have to find the leading zeros of `div` to know where its msb (most significant
+            // set bit) is to even begin binary long division. It is also good to know where the msb
+            // of `duo` is so that useful work can be started instead of shifting `div` for all
+            // possible quotients (many division steps are wasted if `duo.leading_zeros()` is large
+            // and `div` starts out being shifted all the way to the msb). Aligning the msbs of
+            // `div` and `duo` could be done by shifting `div` left by
+            // `div.leading_zeros() - duo.leading_zeros()`, but some CPUs without division hardware
+            // also do not have single instructions for calculating `leading_zeros`. Instead of
+            // software doing two bisections to find the two `leading_zeros`, we do one bisection to
+            // find `div.leading_zeros() - duo.leading_zeros()` without actually knowing either of
+            // the leading zeros values.
 
-            // If we shift `duo` right and subtract `div` from the shifted value, and the result is
-            // negative, then the most significant bit of `duo` is even with or has passed the most
-            // significant bit of `div` and the shift can be decreased. Otherwise, the most
-            // significant bit of `duo` has not passed that of `div` and the shift can be increased.
-            //
-            // Example: finding the aligning shift for dividing 178u8 (0b10110010) by 6u8 (0b110)
-            // first loop:
-            // level: 2, shift: 4
-            // duo >> shift: 0b00001011
-            //          div: 0b00000110
-            //             - __________
-            //          sub: 0b00000101
-            // sub is positive, so increase the shift amount by the current level of bisection.
-            // second loop:
-            // level: 1, shift: 6
-            // duo >> shift: 0b00000010
-            //          div: 0b00000110
-            //             - __________
-            //          sub: 0b11111100
-            // sub is negative, so decrease the shift.
-            //
-            // The tricky part is when the significant bits are aligned with each other. In that
-            // case, `duo.wrapping_sub(div)` could be positive or negative and this algorithm falls
-            // into a repeating cycle between two values of `shift` (in this case, it will cycle
-            // between shifts of 4 and 5). The smaller of the two shift values turns out to always
-            // be valid for starting long division.
-            //
-            // (the last step uses `level = 1` again instead of `level = 0`)
-            // level: 1, shift: 5
-            // duo >> shift: 0b00000101
-            //          div: 0b00000110
-            //             - __________
-            //          sub: 0b11111111
-            // sub is negative, so decrease the shift, otherwise keep the shift the same.
-            /*
-            let mut level = $n / 4;
-            let mut shift = $n / 2;
-            let mut duo = duo;
-            loop {
-                let sub = (duo >> shift).wrapping_sub(div);
-                if (sub as $iX) < 0 {
-                    // shift is too high
-                    shift -= level;
-                } else {
-                    // shift is too low
-                    shift += level;
+            let mut shl: usize;
+            if $use_lz {
+                shl = (div.leading_zeros() - duo.leading_zeros()) as usize;
+                if full_normalization {
+                    if duo < (div << shl) {
+                        // when the msb of `duo` and `div` are aligned, the resulting `div` may be
+                        // larger than `duo`, so we decrease the shift by 1.
+                        shl -= 1;
+                    }
                 }
-                // narrow down bisection
-                level >>= 1;
-                if level == 0 {
-                    // final step
-                    let sub = (duo >> shift).wrapping_sub(div);
-                    // if `(sub as $iX) < 0`, it involves cases where sub is smaller than `div`
-                    // when the most significant bits are aligned, like in the example above.
-                    // Then, we can immediately do a long division step without needing a
-                    // normalization check. There is an edge case we avoid by using a `sub < 0`
-                    // comparison rather than a `sub <= 0` comparison on the branch:
-                    // if duo = 0b1001 and div = 0b0100, we could arrive to this branch with
-                    // shift: 1
-                    // duo >> shift: 0b00000100
-                    //          div: 0b00000100
-                    //             - __________
-                    //          sub: 0b00000000
-                    // the problem with this is that `duo >> shift` is shifting off a set bit
-                    // that makes `duo >= 2*(div << shift)`, which would break binary division steps
-                    // that assume normalization, but this cannot happen with `sub < 0`.
-                    //
-                    // If `(sub as $iX) >= 0`, it involves cases where `sub >= div` when the most
-                    // significant bits are aligned. We know that the current shift is the smaller
-                    // shift in the cycle and can automatically be part of a long division step.
-                    if (sub as $iX) < 0 {
-                        shift -= 1;
-                        break
-                    } else {
+            } else {
+                let mut test = duo;
+                shl = 0usize;
+                let mut lvl = $n >> 1;
+                loop {
+                    let tmp = test >> lvl;
+                    // It happens that a final `duo < (div << shl)` check is not needed, because the
+                    // `div <= tmp` check insures that the msb of `test` never passes the msb of
+                    // `div`, and any set bits shifted off the end of `test` would still keep
+                    // `div <= tmp` true.
+                    if div <= tmp {
+                        test = tmp;
+                        shl += lvl;
+                    }
+                    // narrow down bisection
+                    lvl >>= 1;
+                    if lvl == 0 {
                         break
                     }
                 }
+            }
+            // tests the invariants that should hold before beginning binary long division
+            /*
+            if full_normalization {
+                assert!((div << shl) <= duo);
+            }
+            if duo.leading_zeros() != (div << shl).leading_zeros() {
+                assert_eq!(duo.leading_zeros() + 1, (div << shl).leading_zeros());
+                assert!(duo < (div << (shl + 1)));
             }
             */
-
-            if $softnorm {
-                let mut level: usize = $n / 4;
-                let mut shift: usize = $n / 2;
-                // this macro unrolls the algorithm and compilers can easily propogate constants
-                repeat_log!($n, {
-                    if (duo >> shift) < div {
-                        shift -= level;
-                    } else {
-                        shift += level;
-                    }
-                    level >>= 1;
-                    if level == 0 {
-                        if (duo >> shift) < div {
-                            shift -= 1;
-                        }
-                    }
-                });
-                shift
-            } else {
-                let mut shift = (div.leading_zeros() - duo.leading_zeros()) as usize;
-                if duo < (div << shift) {
-                    shift -= 1;
-                }
-                shift
-            }
+            shl
         }
     }
 }

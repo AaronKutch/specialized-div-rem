@@ -18,14 +18,12 @@ default = ["asm", "std"]
 asm = []
 # this is needed for benchmarks and the `println!` in tests
 std = []
-# for testing purposes
-force_software_normalization = []
 
 [dev-dependencies]
 # for random numbers in benchmarks
 rand = "0.7"
 
 [profile.test]
-# testing with `opt-level = 0` optimization is completely impractical, only change if backtraces are
-# not working
+# We want to check that no debug assertions are broken. Testing with `opt-level = 0` optimization is
+# completely impractical however.
 opt-level = 2
