@@ -385,6 +385,7 @@ impl_binary_long!(
 impl_delegate!(
     u32_div_rem_delegate,
     i32_div_rem_delegate,
+    u16_normalization_shift,
     u16_by_u16_div_rem,
     8,
     u8,
@@ -420,6 +421,7 @@ impl_binary_long!(
 impl_delegate!(
     u64_div_rem_delegate,
     i64_div_rem_delegate,
+    u32_normalization_shift,
     u32_by_u32_div_rem,
     16,
     u16,
@@ -476,6 +478,7 @@ test!(
 impl_delegate!(
     u128_div_rem_delegate,
     i128_div_rem_delegate,
+    u64_normalization_shift,
     u64_by_u64_div_rem,
     32,
     u32,

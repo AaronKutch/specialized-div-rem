@@ -116,11 +116,35 @@ macro_rules! test {
                     // lhs: 10000000000000101010101011101010 rhs: 11111101010101000000011101111000
                     if rhs != 0 {
                         let (quo, rem) = $unsigned_name(lhs,rhs);
-                        assert_eq!(lhs, rhs.wrapping_mul(quo).wrapping_add(rem));
+                        if lhs != rhs.wrapping_mul(quo).wrapping_add(rem) {
+                            panic!(
+                                "unsigned division function failed with lhs:{} rhs:{} \
+                                expected:({}, {}) found:({}, {})",
+                                lhs,
+                                rhs,
+                                lhs.wrapping_div(rhs),
+                                lhs.wrapping_rem(rhs),
+                                $unsigned_name(lhs, rhs).0,
+                                $unsigned_name(lhs, rhs).1
+                            );
+                        }
                         // `$signed_name` has already been tested plenty, but the sign bit is set
                         // half the time, so this doubles the work of one fuzzing round
-                        let (quo, rem) = $signed_name(lhs as $iX,rhs as $iX);
-                        assert_eq!(lhs as $iX, (rhs as $iX).wrapping_mul(quo).wrapping_add(rem));
+                        let lhs = lhs as $iX;
+                        let rhs = rhs as $iX;
+                        let (quo, rem) = $signed_name(lhs, rhs);
+                        if lhs != rhs.wrapping_mul(quo).wrapping_add(rem) {
+                            panic!(
+                                "signed division function failed with lhs:{} rhs:{} \
+                                expected:({}, {}) found:({}, {})",
+                                lhs,
+                                rhs,
+                                lhs.wrapping_div(rhs),
+                                lhs.wrapping_rem(rhs),
+                                $signed_name(lhs, rhs).0,
+                                $signed_name(lhs, rhs).1
+                            );
+                        }
                     }
                 }
             }
