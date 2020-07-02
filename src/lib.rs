@@ -27,6 +27,9 @@ mod trifecta;
 #[macro_use]
 mod asymmetric;
 
+#[macro_use]
+mod test;
+
 // `usize_leading_zeros` would be placed in `misc.rs`, but has been placed here because we want to
 // minimize changes to any of the files outside of `lib.rs` when copying and pasting to
 // `compiler-builtins`.
@@ -304,11 +307,11 @@ unsafe fn u128_by_u64_div_rem(duo: u128, div: u64) -> (u64, u64) {
 }
 
 // TODO: if Rust adds a way to check for the "B" extension on RISC-V, then modify this
-#[cfg(any(target_arch = "riscv32", target_arch = "riscv64"))]
+#[cfg(any(feature = "no_lz", target_arch = "riscv32", target_arch = "riscv64"))]
 const USE_LZ: bool = false;
 
 // The rest of the common architectures supply `leading_zeros`
-#[cfg(not(any(target_arch = "riscv32", target_arch = "riscv64")))]
+#[cfg(not(any(feature = "no_lz", target_arch = "riscv32", target_arch = "riscv64")))]
 const USE_LZ: bool = true;
 
 impl_normalization_shift!(u8_normalization_shift, USE_LZ, 8, u8, i8, inline);

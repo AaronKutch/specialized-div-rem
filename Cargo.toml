@@ -18,6 +18,8 @@ default = ["asm", "std"]
 asm = []
 # this is needed for benchmarks and the `println!` in tests
 std = []
+# forces using software normalization instead of using `leading_zeros`, for testing purposes
+no_lz = []
 
 [dev-dependencies]
 # for random numbers in benchmarks
