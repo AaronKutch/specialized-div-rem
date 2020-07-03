@@ -155,7 +155,7 @@ macro_rules! test {
 fn normalization_shift_equivalence() {
     for duo in 0..=u8::MAX {
         for div in 0..=u8::MAX {
-            if div == 0 || duo < div{
+            if div == 0 || duo < div {
                 continue;
             }
 
@@ -175,7 +175,7 @@ fn normalization_shift_equivalence() {
                 }
                 lvl >>= 1;
                 if lvl == 0 {
-                    break
+                    break;
                 }
             }
 

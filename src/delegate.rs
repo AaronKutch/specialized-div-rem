@@ -26,7 +26,7 @@ macro_rules! impl_delegate {
             #[$unsigned_attr]
         )*
         pub fn $unsigned_name(duo: $uD, div: $uD) -> ($uD, $uD) {
-            // The "mul or mul - 1" algorithm, undersubtracting long division algorithm, or any kind
+            // The two possibility algorithm, undersubtracting long division algorithm, or any kind
             // of reciprocal based algorithm will not be fastest, because they involve large
             // multiplications that we assume to not be fast enough relative to the divisions to
             // outweigh setup times.
@@ -115,17 +115,17 @@ macro_rules! impl_delegate {
                             // Short division of $uD by a $uH, using $uX by $uX division
                             let div_0 = div_lo as $uH as $uX;
                             let (quo_hi, rem_3) = $half_division(duo_hi, div_0);
-    
+
                             let duo_mid =
                                 ((duo >> $n_h) as $uH as $uX)
                                 | (rem_3 << $n_h);
                             let (quo_1, rem_2) = $half_division(duo_mid, div_0);
-    
+
                             let duo_lo =
                                 (duo as $uH as $uX)
                                 | (rem_2 << $n_h);
                             let (quo_0, rem_1) = $half_division(duo_lo, div_0);
-    
+
                             return (
                                 (quo_0 as $uD)
                                 | ((quo_1 as $uD) << $n_h)

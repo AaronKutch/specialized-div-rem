@@ -20,15 +20,14 @@ macro_rules! impl_trifecta {
         /// x86_64 has an assembly instruction which can divide a 128 bit integer by a 64 bit
         /// integer). In that case, the `_asymmetric` algorithm should be used instead of this one.
         ///
-        /// Note that sometimes, CPUs can have hardware division, but it is emulated in a way that
-        /// is not significantly faster than custom binary long division, and/or the hardware
+        /// Note that sometimes, CPUs can have hardware division, but it is implemented in a way
+        /// that is not significantly faster than custom binary long division, and/or the hardware
         /// multiplier is so slow that the alternative `_delegate` algorithm is faster. `_trifecta`
         /// depends on both the divider and multplier being fast.
         ///
         /// This is called the trifecta algorithm because it uses three main algorithms: short
-        /// division for small divisors, the "mul or mul - 1" algorithm for when the divisor is
-        /// large enough for the quotient to be determined to be one of two values via only one
-        /// small division, and an undersubtracting long division algorithm for middle cases.
+        /// division for small divisors, the two possibility algorithm for large divisors, and an
+        /// undersubtracting long division algorithm for intermediate cases.
         ///
         /// # Panics
         ///
@@ -37,11 +36,8 @@ macro_rules! impl_trifecta {
             #[$unsigned_attr]
         )*
         pub fn $unsigned_name(duo: $uD, div: $uD) -> ($uD, $uD) {
-            // wrapping_{} was used everywhere for better performance when compiling with
-            // `debug-assertions = true`
-
             // This replicates `carrying_mul` (rust-lang rfc #2417). LLVM correctly optimizes this
-            // to use a widening multiply to 128 bits.
+            // to use a widening multiply to 128 bits on the relevant architectures.
             #[inline]
             fn carrying_mul(lhs: $uX, rhs: $uX) -> ($uX, $uX) {
                 let tmp = (lhs as $uD).wrapping_mul(rhs as $uD);
@@ -60,10 +56,11 @@ macro_rules! impl_trifecta {
                 panic!("attempt to divide by zero")
             }
 
-            // Note that throughout this function, `lo` and `hi` refer to the high and low `n` bits
-            // of a `$uD`, `0` to `3` refer to the 4 `n_h` bit parts of a `$uD`,
-            // and `mid` refer to the middle two `n_h` parts.
-
+            // Trying to use a normalization shift function will cause inelegancies in the code and
+            // inefficiencies for architectures with a native count leading zeros instruction. The
+            // undersubtracting algorithm needs both values (keeping the original `div_lz` but
+            // updating `duo_lz` multiple times), so we assume hardware support for fast
+            // `leading_zeros` calculation.
             let div_lz = div.leading_zeros();
             let mut duo_lz = duo.leading_zeros();
 
@@ -76,9 +73,9 @@ macro_rules! impl_trifecta {
                 // The quotient cannot be more than 1. The highest set bit of `duo` needs to be at
                 // least one place higher than `div` for the quotient to be more than 1.
                 if duo >= div {
-                    return (1,duo.wrapping_sub(div))
+                    return (1, duo - div)
                 } else {
-                    return (0,duo)
+                    return (0, duo)
                 }
             }
 
@@ -96,9 +93,6 @@ macro_rules! impl_trifecta {
                 )
             }
 
-            // relative leading significant bits, cannot overflow because of above branches
-            let rel_leading_sb = div_lz.wrapping_sub(duo_lz);
-
             // `{2^n, 2^div_sb} <= duo < 2^n_d`
             // `1 <= div < {2^duo_sb, 2^(n_d - 1)}`
             // short division branch
@@ -109,7 +103,7 @@ macro_rules! impl_trifecta {
                 let (quo_hi, rem_3) = $half_division(duo_hi, div_0);
 
                 let duo_mid =
-                    ((duo >> $n_h) as $uH as $uX)
+                ((duo >> $n_h) as $uH as $uX)
                     | (rem_3 << $n_h);
                 let (quo_1, rem_2) = $half_division(duo_mid, div_0);
 
@@ -126,171 +120,198 @@ macro_rules! impl_trifecta {
                 )
             }
 
+            // relative leading significant bits, cannot overflow because of above branches
+            let lz_diff = div_lz - duo_lz;
+
             // `{2^n, 2^div_sb} <= duo < 2^n_d`
             // `2^n_h <= div < {2^duo_sb, 2^(n_d - 1)}`
             // `mul` or `mul - 1` branch
-            if rel_leading_sb < $n_h {
-                // proof that `quo` can only be `mul` or `mul - 1`.
-                // disclaimer: this is not rigorous
+            if lz_diff < $n_h {
+                // Two possibility division algorithm
+
+                // The most significant bits of `duo` and `div` are within `$n_h` bits of each
+                // other. If we take the `n` most significant bits of `duo` and divide them by the
+                // corresponding bits in `div`, it produces a quotient value `quo`. It happens that
+                // `quo` or `quo - 1` will always be the correct quotient for the whole number. In
+                // other words, the bits less significant than the `n` most significant bits of
+                // `duo` and `div` can only influence the quotient to be one of two values.
+                // Because there are only two possibilities, there only needs to be one `$uH` sized
+                // division, a `$uH` by `$uD` multiplication, and only one branch with a few simple
+                // operations.
                 //
-                // We are trying to find the quotient, `quo`.
-                // 1. quo = duo / div. (definition)
+                // Proof that the true quotient can only be `quo` or `quo - 1`.
+                // All `/` operators here are floored divisions.
                 //
-                // `shift` is the number of bits not in the higher `n` significant bits of `duo`
-                // 2. shift = n - duo_lz. (definition)
-                // 3. duo_sig_n == duo / 2^shift. (definition)
-                // 4. div_sig_n == div / 2^shift. (definition)
-                // Note: the `_sig_n` (which in my notation usually means that the variable uses the
-                // most significant `n` bits) on `div_sig_n` is a misnomer, because instead of using
-                // a shift by `n - div_lz`, what I do is use the `n - duo_lz` shift so that the bits
-                // of (4) correspond to (3).
+                // `shift` is the number of bits not in the higher `n` significant bits of `duo`.
+                // (definitions)
+                // 0. shift = n - duo_lz
+                // 1. duo_sig_n == duo / 2^shift
+                // 2. div_sig_n == div / 2^shift
+                // 3. quo == duo_sig_n / div_sig_n
                 //
-                // this is because of the bits less significant than the sig_n bits that are cut off
-                // during the bit shift
+                //
+                // We are trying to find the true quotient, `true_quo`.
+                // 4. true_quo = duo / div. (definition)
+                //
+                // This is true because of the bits that are cut off during the bit shift.
                 // 5. duo_sig_n * 2^shift <= duo < (duo_sig_n + 1) * 2^shift.
                 // 6. div_sig_n * 2^shift <= div < (div_sig_n + 1) * 2^shift.
                 //
-                // dividing each bound of (5) by each bound of (6)
+                // Dividing each bound of (5) by each bound of (6) gives 4 possibilities for what
+                // `true_quo == duo / div` is bounded by:
                 // (duo_sig_n * 2^shift) / (div_sig_n * 2^shift)
                 // (duo_sig_n * 2^shift) / ((div_sig_n + 1) * 2^shift)
                 // ((duo_sig_n + 1) * 2^shift) / (div_sig_n * 2^shift)
                 // ((duo_sig_n + 1) * 2^shift) / ((div_sig_n + 1) * 2^shift)
-                // simplifying each of these four
+                //
+                // Simplifying each of these four:
                 // duo_sig_n / div_sig_n
                 // duo_sig_n / (div_sig_n + 1)
                 // (duo_sig_n + 1) / div_sig_n
                 // (duo_sig_n + 1) / (div_sig_n + 1)
-                // taking the smallest and the largest of these as the low and high bounds
-                // and replacing `duo / div` with `quo`
-                // 7. duo_sig_n / (div_sig_n + 1) <= quo < (duo_sig_n + 1) / div_sig_n
                 //
-                // Here is where the range restraints from the previous branches becomes necessary.
-                // To help visualize what needs to happen here, is that the top `n` significant
-                // bits of `duo` are being divided with the corresponding bits of `div`.
+                // Taking the smallest and the largest of these as the low and high bounds
+                // and replacing `duo / div` with `true_quo`:
+                // 7. duo_sig_n / (div_sig_n + 1) <= true_quo < (duo_sig_n + 1) / div_sig_n
                 //
-                // The `rel_leading_sb < n_h` conditional on this branch makes sure that `div_sig_n`
-                // is at least `2^n_h`, and the previous branches make sure that the highest bit of
-                // `div_sig_n` is not the `2^(n - 1)` bit (which `duo_sig_n` has been shifted up to
-                // attain).
+                // The `lz_diff < n_h` conditional on this branch makes sure that `div_sig_n` is at
+                // least `2^n_h`, and the `div_lz <= duo_lz` branch makes sure that the highest bit
+                // of `div_sig_n` is not the `2^(n - 1)` bit.
                 // 8. `2^(n - 1) <= duo_sig_n < 2^n`
                 // 9. `2^n_h <= div_sig_n < 2^(n - 1)`
-                // 10. mul == duo_sig_n / div_sig_n. (definition)
                 //
-                // Using the bounds (8) and (9) with the `duo_sig_n / (div_sig_n + 1)` term. Note
-                // that on the `<` bounds we subtract 1 to make it inclusive.
-                // (2^n - 1) / (2^n_h + 1) = 2^n_h - 1
-                // 2^(n - 1) / 2^(n - 1) = 1
-                // The other equations using the both upper bounds or both lower bounds end up with
-                // values in the middle of this range.
-                // 11. 1 <= mul <= 2^n_h - 1
+                // We want to prove that either
+                // `(duo_sig_n + 1) / div_sig_n == duo_sig_n / (div_sig_n + 1)` or that
+                // `(duo_sig_n + 1) / div_sig_n == duo_sig_n / (div_sig_n + 1) + 1`.
                 //
-                // However, all this tells us is that `mul` can fit in a $uH.
-                // We want to show that `mul - 1 <= quo < mul + 1`. What this and (7) means is that
-                // the bits cut off by the shift at the beginning can only affect `quo` enough to
-                // change it between two values. First, I will show that
-                // `(duo_sig_n + 1) / div_sig_n` is equal to or less than `mul + 1`. We cannot
-                // simply use algebra here and say that `1 / div_sig_n` is 0, because we are working
-                // with truncated integer division. If the remainder is `div_sig_n - 1`, then the
-                // `+ 1` can be enough to cross the boundary and increment the quotient
-                // (e.x. 127/32 = 3, 128/32 = 4). Instead, we notice that in order for the remainder
-                // of `(duo_sig_n + x) / div_sig_n` to be wrapped around twice, `x` must be 1 for
-                // one of the wrap arounds and another `div_sig_n` added on to it to wrap around
-                // again. This cannot happen even if `div_sig_n` were 1, so
-                // 12. duo_sig_n / (div_sig_n + 1) <= quo < mul + 1
+                // We also want to prove that `quo` is one of these:
+                // `duo_sig_n / div_sig_n == duo_sig_n / (div_sig_n + 1)` or
+                // `duo_sig_n / div_sig_n == (duo_sig_n + 1) / div_sig_n`.
                 //
-                // Next, we want to show that `duo_sig_n / (div_sig_n + 1)` is more than or equal to
-                // `mul - 1`. Putting all the combinations of bounds from (8) and (9) into (10) and
-                // `duo_sig_n / (div_sig_n + 1)`,
-                // (2^n - 1) / 2^n_h = 2^n_h - 1
-                // (2^n - 1) / (2^n_h + 1) = 2^n_h - 1
+                // When 1 is added to the numerator of `duo_sig_n / div_sig_n` to produce
+                // `(duo_sig_n + 1) / div_sig_n`, it is not possible that the value increases by
+                // more than 1 with floored integer arithmetic and `div_sig_n != 0`. Consider
+                // `x/y + 1 < (x + 1)/y` <=> `x/y + 1 < x/y + 1/y` <=> `1 < 1/y` <=> `y < 1`.
+                // `div_sig_n` is a nonzero integer. Thus,
+                // 10. `duo_sig_n / div_sig_n == (duo_sig_n + 1) / div_sig_n` or
+                //     `(duo_sig_n / div_sig_n) + 1 == (duo_sig_n + 1) / div_sig_n.
                 //
-                // (2^n - 1) / (2^(n - 1) - 1) = 2
-                // (2^n - 1) / (2^(n - 1) - 1 + 1) = 1
+                // When 1 is added to the denominator of `duo_sig_n / div_sig_n` to produce
+                // `duo_sig_n / (div_sig_n + 1)`, it is not possible that the value decreases by
+                // more than 1 with the bounds (8) and (9). Consider `x/y - 1 <= x/(y + 1)` <=>
+                // `(x - y)/y < x/(y + 1)` <=> `(y + 1)*(x - y) < x*y` <=> `x*y - y*y + x - y < x*y`
+                // <=> `x < y*y + y`. The smallest value of `div_sig_n` is `2^n_h` and the largest
+                // value of `duo_sig_n` is `2^n - 1`. Substituting reveals `2^n - 1 < 2^n + 2^n_h`.
+                // Thus,
+                // 11. `duo_sig_n / div_sig_n == duo_sig_n / (div_sig_n + 1)` or
+                //     `(duo_sig_n / div_sig_n) - 1` == duo_sig_n / (div_sig_n + 1)`
                 //
-                // 2^(n - 1) / 2^n_h = 2^(n_h - 1)
-                // 2^(n - 1) / (2^n_h + 1) = 2^(n_h - 1) - 1
-                //
-                // 2^(n - 1) / (2^(n - 1) - 1) = 1
-                // 2^(n - 1) / 2^(n - 1) = 1
-                //
-                // 13. mul - 1 <= quo < mul + 1
+                // Combining both (10) and (11), we know that
+                // `quo - 1 <= duo_sig_n / (div_sig_n + 1) <= true_quo
+                // < (duo_sig_n + 1) / div_sig_n <= quo + 1` and therefore:
+                // 12. quo - 1 <= true_quo < quo + 1
                 //
                 // In a lot of division algorithms using smaller divisions to construct a larger
-                // division, we often encounter a situation where the approximate `mul` value
-                // calculated from a smaller division is a few increments away from the true `quo`
-                // value. In those algorithms, they have to do more divisions. Because of the fact
-                // that our `quo` can only be one of two values, we can try the higher value `mul`
-                // and see if `duo - (mul*div)` overflows. If it did overflow, then `quo` must be
-                // `mul - 1`, and because we already calculated `duo - (mul*div)` with wrapping
-                // operations, we can do simple operations without dividing again to find
-                // `duo - ((mul - 1)*div) = duo - (mul*div - div) = duo + div - mul*div`. If it
-                // did not overflow, then `mul` must be the answer, because the remainder of
-                // `duo - ((mul - 1)*div)` is larger and farther away from overflow than
-                // `duo - (mul*div)`, which we already found is not overflowing.
-                //
-                // Thus, we find the quotient using only an `n` sized divide to find `mul`
-                // and a `n` by `d_n` sized multiply and comparison to find if `quo * mul > duo`,
-                // following with adds and subtracts to get the correct values.
+                // division, we often encounter a situation where the approximate `quo` value
+                // calculated from a smaller division is multiple increments away from the true
+                // `quo` value. In those algorithms, multiple correction steps have to be applied.
+                // Those correction steps may need more multiplications to test `duo - (quo*div)`
+                // again. Because of the fact that our `quo` can only be one of two values, we can
+                // see if `duo - (quo*div)` overflows. If it did overflow, then we know that we have
+                // the larger of the two values (since the true quotient is unique, and any larger
+                // quotient will cause `duo - (quo*div)` to be negative). Also because there is only
+                // one correction needed, we can calculate the remainder `duo - (true_quo*div) ==
+                // duo - ((quo - 1)*div) == duo - (quo*div - div) == duo + div - quo*div`.
+                // If `duo - (quo*div)` did not overflow, then we have the correct answer.
                 let shift = n.wrapping_sub(duo_lz);
                 let duo_sig_n = (duo >> shift) as $uX;
                 let div_sig_n = (div >> shift) as $uX;
-                let mul = $half_division(duo_sig_n, div_sig_n).0;
-                // inline `n` bit by `n_d` bit multiplication and overflow check (we cannot do
-                // `mul * div > duo` directly because of possibility of overflow beyond 128 bits)
-                // duo cannot be more than `2^n_d - 1`, and overflow means a value more than that
+                let quo = $half_division(duo_sig_n, div_sig_n).0;
+
+                // The larger `quo` value can overflow `$uD` in the right circumstances. This is a
+                // manual `carrying_mul_add` with overflow checking.
                 let div_lo = div as $uX;
                 let div_hi = (div >> n) as $uX;
-                let (tmp_lo, carry) = carrying_mul(mul,div_lo);
-                let (tmp_hi, overflow) = carrying_mul_add(mul,div_hi,carry);
+                let (tmp_lo, carry) = carrying_mul(quo, div_lo);
+                let tmp_hi = (quo as $uD).wrapping_mul(div_hi as $uD);
+                // The overflow can only come from the carry addition, because `quo` and `div_hi`
+                // are less than `1 << n`.
+                let (tmp_hi, overflow) = tmp_hi.overflowing_add(carry as $uD);
                 let tmp = (tmp_lo as $uD) | ((tmp_hi as $uD) << n);
-                // Note that the overflow cannot be more than 1, otherwise the `div` subtraction
-                // would not be able to bring the remainder value below 2^n_d - 1, which
-                // contradicts many things. The `& 1` is here to encourage overflow flag use.
-                if ((overflow & 1) != 0) || (duo < tmp) {
+                if overflow || (duo < tmp) {
                     return (
-                        mul.wrapping_sub(1) as $uD,
-                        duo.wrapping_add(div.wrapping_sub(tmp))
+                        (quo - 1) as $uD,
+                        // Both the addition and subtraction can overflow, but when combined end up
+                        // as a correct positive number.
+                        duo.wrapping_add(div).wrapping_sub(tmp)
                     )
                 } else {
                     return (
-                        mul as $uD,
-                        duo.wrapping_sub(tmp)
+                        quo as $uD,
+                        duo - tmp
                     )
                 }
             }
 
             // Undersubtracting long division algorithm.
-            // Instead of clearing a minimum of 1 bit from `duo` per iteration via
-            // binary long division, `n_h - 1` bits are cleared per iteration with this algorithm.
-            // It is a more complicated version of regular long division. Most integer division
-            // algorithms tend to guess a part of the quotient, and may have a larger quotient than
-            // the true quotient (which when multiplied by `div` will "oversubtract" the original
-            // dividend). They then check if the quotient was in fact too large and then have to
-            // correct it. This long division algorithm has been carefully constructed to always
-            // underguess the quotient by slim margins. This allows different subalgorithms
-            // to be blindly jumped to without needing an extra correction step.
+            // Instead of clearing a minimum of 1 bit from `duo` per iteration via binary long
+            // division, `n_h - 1` bits are cleared per iteration with this algorithm. It is a more
+            // complicated version of regular long division. Most integer division algorithms tend
+            // to guess a part of the quotient, and may have a larger quotient than the true
+            // quotient (which when multiplied by `div` will "oversubtract" the original dividend).
+            // They then check if the quotient was in fact too large and then have to correct it.
+            // This long division algorithm has been carefully constructed to always underguess the
+            // quotient by slim margins. This allows different subalgorithms to be blindly jumped to
+            // without needing an extra correction step.
             //
-            // The only problem is that this subalgorithm will not work
-            // for many ranges of `duo` and `div`. Fortunately, the short division,
-            // mul or mul - 1 algorithm, and simple divisions happen to exactly fill these gaps.
+            // The only problem is that this subalgorithm will not work for many ranges of `duo` and
+            // `div`. Fortunately, the short division, two possibility algorithm, and other simple
+            // cases happen to exactly fill these gaps.
             //
-            // For an example, consider the division of 76543210 by 213 and assume that `n_h`
-            // is equal to two decimal digits (note: we are working with base 10 here for
-            // readability).
-            // The first `h_n` part of the divisor (21) is taken and is incremented by
-            // 1 to prevent oversubtraction.
-            // In the first step, the first `n` part of duo (7654) is divided by the 22 to make 347.
-            // We remember that there was 1 extra place not in the `n_h` part of the divisor and
-            // shift the 347 right by 1, in contrast to a normal long division. The 347 is
-            // multiplied by the whole divisor to make 73911, and subtracted from duo to finish the
-            // step.
+            // For an example, consider the division of 76543210 by 213 and assume that `n_h` is
+            // equal to two decimal digits (note: we are working with base 10 here for readability).
+            // The first `sig_n_h` part of the divisor (21) is taken and is incremented by 1 to
+            // prevent oversubtraction. We also record the number of extra places not a part of
+            // the `sig_n` or `sig_n_h` parts.
+            //
+            // sig_n_h == 2 digits, sig_n == 4 digits
+            //
+            // vvvv     <- `duo_sig_n`
+            // 76543210
+            //     ^^^^ <- extra places in duo, `duo_extra == 4`
+            //
+            // vv  <- `div_sig_n_h`
+            // 213
+            //   ^ <- extra places in div, `div_extra == 1`
+            //
+            // The difference in extra places, `duo_extra - div_extra == extra_shl == 3`, is used
+            // for shifting partial sums in the long division.
+            //
+            // In the first step, the first `sig_n` part of duo (7654) is divided by
+            // `div_sig_n_h_add_1` (22), which results in a partial quotient of 347. This is
+            // multiplied by the whole divisor to make 73911, which is shifted left by `extra_shl`
+            // and subtracted from duo. The partial quotient is also shifted left by `extra_shl` to
+            // be added to `quo`.
+            //
             //    347
             //  ________
             // |76543210
             // -73911
             //   2632210
+            //
+            // Variables dependent on duo have to be updated:
+            //
+            // vvvv    <- `duo_sig_n == 2632`
+            // 2632210
+            //     ^^^ <- `duo_extra == 3`
+            //
+            // `extra_shl == 2`
+            //
             // Two more steps are taken after this and then duo fits into `n` bits, and then a final
-            // normal long division step is made.
+            // normal long division step is made. The partial quotients are all progressively added
+            // to each other in the actual algorithm, but here I have left them all in a tower that
+            // can be added together to produce the quotient, 359357.
+            //
             //        14
             //       443
             //     119
@@ -303,81 +324,78 @@ macro_rules! impl_trifecta {
             //     97510
             //    -94359
             //      3151
-            // The tower at the top is added together to produce the quotient, 359357 (but in the
-            // actual algorithm, the quotient is progressively added to each step instead of at
-            // the end).
-            // In the actual algorithm below, instead of the final normal long division step, one of
-            // the three other algorithms ("quotient is 0 or 1", "mul or mul - 1", or
-            // "n sized division") is used.
+            //     -2982
+            //       169 <- the remainder
 
             let mut duo = duo;
-
-            // the number of lesser significant bits not a part of `div_sig_n_h`. Must be positive.
-            let div_lesser_places = (n + $n_h).wrapping_sub(div_lz);
-
-            // the most significant `n_h` bits of div
-            let div_sig_n_h = (div >> div_lesser_places) as $uH;
-
-            // has to be a `$uX` in case of overflow
-            let div_sig_n_h_add1 = (div_sig_n_h as $uX).wrapping_add(1);
-
             let mut quo: $uD = 0;
+
+            // The number of lesser significant bits not a part of `div_sig_n_h`
+            let div_extra = (n + $n_h) - div_lz;
+
+            // The most significant `n_h` bits of div
+            let div_sig_n_h = (div >> div_extra) as $uH;
+
+            // This needs to be a `$uX` in case of overflow from the increment
+            let div_sig_n_h_add1 = (div_sig_n_h as $uX) + 1;
 
             // `{2^n, 2^(div_sb + n_h)} <= duo < 2^n_d`
             // `2^n_h <= div < {2^(duo_sb - n_h), 2^n}`
             loop {
-                let duo_lesser_places = n.wrapping_sub(duo_lz);
-                let duo_sig_n = (duo >> duo_lesser_places) as $uX;
+                // The number of lesser significant bits not a part of `duo_sig_n`
+                let duo_extra = n.wrapping_sub(duo_lz);
 
-                if div_lesser_places <= duo_lesser_places {
-                    let mul = $half_division(duo_sig_n, div_sig_n_h_add1).0 as $uD;
-                    let place = duo_lesser_places.wrapping_sub(div_lesser_places);
+                // The most significant `n` bits of `duo`
+                let duo_sig_n = (duo >> duo_extra) as $uX;
 
-                    //addition to the quotient
-                    quo = quo.wrapping_add(mul << place);
+                // the two possibility algorithm requires that the difference between msbs is less
+                // than `n_h`, so the comparison is `<=` here.
+                if div_extra <= duo_extra {
+                    // Undersubtracting long division step
+                    let quo_part = $half_division(duo_sig_n, div_sig_n_h_add1).0 as $uD;
+                    let extra_shl = duo_extra - div_extra;
 
-                    //subtraction from `duo`
-                    //at least `n_h - 1` bits are cleared from `duo` here
-                    duo = duo.wrapping_sub(div.wrapping_mul(mul) << place);
+                    // Addition to the quotient.
+                    quo += (quo_part << extra_shl);
+
+                    // Subtraction from `duo`. At least `n_h - 1` bits are cleared from `duo` here.
+                    duo -= (div.wrapping_mul(quo_part) << extra_shl);
                 } else {
-                    //`mul` or `mul - 1` algorithm
-                    let shift = n.wrapping_sub(duo_lz);
+                    // Two possibility algorithm
+                    let shift = n - duo_lz;
                     let duo_sig_n = (duo >> shift) as $uX;
                     let div_sig_n = (div >> shift) as $uX;
-                    let mul = $half_division(duo_sig_n, div_sig_n).0;
+                    let quo_part = $half_division(duo_sig_n, div_sig_n).0;
                     let div_lo = div as $uX;
                     let div_hi = (div >> n) as $uX;
 
-                    let (tmp_lo, carry) = carrying_mul(mul,div_lo);
+                    let (tmp_lo, carry) = carrying_mul(quo_part, div_lo);
                     // The undersubtracting long division algorithm has already run once, so
-                    // overflow beyond 128 bits is not possible here
-                    let (tmp_hi, _) = carrying_mul_add(mul,div_hi,carry);
+                    // overflow beyond `$uD` bits is not possible here
+                    let (tmp_hi, _) = carrying_mul_add(quo_part, div_hi, carry);
                     let tmp = (tmp_lo as $uD) | ((tmp_hi as $uD) << n);
 
                     if duo < tmp {
                         return (
-                            // note that this time, the "mul or mul - 1" result is added to `quo`
-                            // to get the final correct quotient
-                            quo.wrapping_add(mul.wrapping_sub(1) as $uD),
-                            duo.wrapping_add(
-                                div.wrapping_sub(tmp)
-                            )
+                            quo + ((quo_part - 1) as $uD),
+                            duo.wrapping_add(div).wrapping_sub(tmp)
                         )
                     } else {
                         return (
-                            quo.wrapping_add(mul as $uD),
-                            duo.wrapping_sub(tmp)
+                            quo + (quo_part as $uD),
+                            duo - tmp
                         )
                     }
                 }
 
                 duo_lz = duo.leading_zeros();
+
                 if div_lz <= duo_lz {
-                    //quotient can have 0 or 1 added to it
+                    // quotient can have 0 or 1 added to it
                     if div <= duo {
                         return (
-                            quo.wrapping_add(1),
-                            duo.wrapping_sub(div)
+                            quo + 1,
+                            duo - div
                         )
                     } else {
                         return (
@@ -389,11 +407,11 @@ macro_rules! impl_trifecta {
 
                 // This can only happen if `div_sd < n` (because of previous "quo = 0 or 1"
                 // branches), but it is not worth it to unroll further.
-                if duo_lz >= n {
+                if n <= duo_lz {
                     // simple division and addition
                     let tmp = $half_division(duo as $uX, div as $uX);
                     return (
-                        quo.wrapping_add(tmp.0 as $uD),
+                        quo + (tmp.0 as $uD),
                         tmp.1 as $uD
                     )
                 }
@@ -409,15 +427,14 @@ macro_rules! impl_trifecta {
         /// x86_64 has an assembly instruction which can divide a 128 bit integer by a 64 bit
         /// integer). In that case, the `_asymmetric` algorithm should be used instead of this one.
         ///
-        /// Note that sometimes, CPUs can have hardware division, but it is emulated in a way that
-        /// is not significantly faster than custom binary long division, and/or the hardware
+        /// Note that sometimes, CPUs can have hardware division, but it is implemented in a way
+        /// that is not significantly faster than custom binary long division, and/or the hardware
         /// multiplier is so slow that the alternative `_delegate` algorithm is faster. `_trifecta`
         /// depends on both the divider and multplier being fast.
         ///
         /// This is called the trifecta algorithm because it uses three main algorithms: short
-        /// division for small divisors, the "mul or mul - 1" algorithm for when the divisor is
-        /// large enough for the quotient to be determined to be one of two values via only one
-        /// small division, and an undersubtracting long division algorithm for middle cases.
+        /// division for small divisors, the two possibility algorithm for large divisors, and an
+        /// undersubtracting long division algorithm for intermediate cases.
         ///
         /// # Panics
         ///
