@@ -1,5 +1,3 @@
-//! miscellanious functions and macros used in the rest of the crate
-
 macro_rules! impl_normalization_shift {
     (
         $name:ident, // name of the normalization shift function
