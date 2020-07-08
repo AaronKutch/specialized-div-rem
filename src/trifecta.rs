@@ -103,7 +103,7 @@ macro_rules! impl_trifecta {
                 let (quo_hi, rem_3) = $half_division(duo_hi, div_0);
 
                 let duo_mid =
-                ((duo >> $n_h) as $uH as $uX)
+                    ((duo >> $n_h) as $uH as $uX)
                     | (rem_3 << $n_h);
                 let (quo_1, rem_2) = $half_division(duo_mid, div_0);
 
@@ -233,12 +233,9 @@ macro_rules! impl_trifecta {
                 let div_lo = div as $uX;
                 let div_hi = (div >> n) as $uX;
                 let (tmp_lo, carry) = carrying_mul(quo, div_lo);
-                let tmp_hi = (quo as $uD).wrapping_mul(div_hi as $uD);
-                // The overflow can only come from the carry addition, because `quo` and `div_hi`
-                // are less than `1 << n`.
-                let (tmp_hi, overflow) = tmp_hi.overflowing_add(carry as $uD);
+                let (tmp_hi, overflow) = carrying_mul_add(quo, div_hi, carry);
                 let tmp = (tmp_lo as $uD) | ((tmp_hi as $uD) << n);
-                if overflow || (duo < tmp) {
+                if (overflow != 0) || (duo < tmp) {
                     return (
                         (quo - 1) as $uD,
                         // Both the addition and subtraction can overflow, but when combined end up

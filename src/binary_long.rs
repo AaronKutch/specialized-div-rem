@@ -13,10 +13,11 @@ macro_rules! impl_binary_long {
         /// tuple.
         ///
         /// This uses binary long division with no calls to smaller divisions, and is designed for
-        /// CPUs without fast division hardware. The algorithm used is designed for architectures
-        /// without predicated instructions. If more performance is wanted for a predicated
-        /// architecture, a custom assembly routine using one of the algorithms described in the
-        /// documentation of this function should be used instead.
+        /// CPUs without fast division hardware. The algorithm used has good performance for CPUs
+        /// with large branch miss penalties and computer architectures without predicated
+        /// instructions. For architectures with predicated instructions, one of the algorithms
+        /// described in the documentation of this function probably has higher performance, and a
+        /// custom assembly routine should be used.
         ///
         /// # Panics
         ///
@@ -123,7 +124,7 @@ macro_rules! impl_binary_long {
             // complications to be decently fast.
             /*
             let div_original = div;
-            let mut shl = $normalization_shift(duo, div, false);
+            let shl = $normalization_shift(duo, div, false);
             let mut div: $uX = div << shl;
             let mut pow: $uX = 1 << shl;
             let mut quo: $uX = 0;
@@ -372,27 +373,23 @@ macro_rules! impl_binary_long {
             // predication or even branching. This involves creating a mask from the sign bit and
             // performing different kinds of steps using that.
             /*
-            let div_original = div;
-            let mut shl = $normalization_shift(duo, div, true);
+            let shl = $normalization_shift(duo, div, true);
             let mut div: $uX = div << shl;
             let mut pow: $uX = 1 << shl;
             let mut quo: $uX = 0;
-            let mut i = shl;
             loop {
-                if i == 0 {
-                    break;
-                }
-                i -= 1;
                 let sub = duo.wrapping_sub(div);
                 let sign_mask = !((sub as $iX).wrapping_shr($n - 1) as $uX);
                 duo -= div & sign_mask;
                 quo |= pow & sign_mask;
                 div >>= 1;
                 pow >>= 1;
+                if pow == 0 {
+                    break;
+                }
             }
             return (quo, duo);
             */
-
             // However, it requires about 4 extra operations (smearing the sign bit, negating the
             // mask, and applying the mask twice) on top of the operations done by the actual
             // algorithm. With SWAR however, just 2 extra operations are needed, making it
@@ -463,7 +460,7 @@ macro_rules! impl_binary_long {
             // 0b1010_0010, 0b1010_0001).
             /*
             let div_original = div;
-            let mut shl = $normalization_shift(duo, div, true);
+            let shl = $normalization_shift(duo, div, true);
             let mut div: $uX = (div << shl);
             let mut pow: $uX = 1 << shl;
             let mut quo: $uX = pow;
@@ -478,8 +475,6 @@ macro_rules! impl_binary_long {
                     // Negated binary long division step.
                     duo = duo.wrapping_add(div);
                     quo = quo.wrapping_sub(pow);
-                    pow >>= 1;
-                    div >>= 1;
                 } else {
                     // Normal long division step.
                     if duo < div_original {
@@ -487,9 +482,9 @@ macro_rules! impl_binary_long {
                     }
                     duo = duo.wrapping_sub(div);
                     quo = quo.wrapping_add(pow);
-                    pow >>= 1;
-                    div >>= 1;
                 }
+                pow >>= 1;
+                div >>= 1;
             }
             */
 
@@ -563,10 +558,11 @@ macro_rules! impl_binary_long {
         /// tuple.
         ///
         /// This uses binary long division with no calls to smaller divisions, and is designed for
-        /// CPUs without fast division hardware. The algorithm used is designed for architectures
-        /// without predicated instructions. If more performance is wanted for a predicated
-        /// architecture, a custom assembly routine using one of the algorithms described in the
-        /// documentation of this function should be used instead.
+        /// CPUs without fast division hardware. The algorithm used has good performance for CPUs
+        /// with large branch miss penalties and computer architectures without predicated
+        /// instructions. For architectures with predicated instructions, one of the algorithms
+        /// described in the documentation of this function probably has higher performance, and a
+        /// custom assembly routine should be used.
         ///
         /// # Panics
         ///
