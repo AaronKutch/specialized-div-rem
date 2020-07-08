@@ -98,7 +98,7 @@ macro_rules! impl_trifecta {
             // short division branch
             if div_lz >= (n + $n_h) {
                 // `1 <= div < {2^duo_sb, 2^n_h}`
-                let duo_hi = (duo >> n) as $uX;
+                /*let duo_hi = (duo >> n) as $uX;
                 let div_0 = div as $uH as $uX;
                 let (quo_hi, rem_3) = $half_division(duo_hi, div_0);
 
@@ -117,7 +117,62 @@ macro_rules! impl_trifecta {
                     | ((quo_1 as $uD) << $n_h)
                     | ((quo_hi as $uD) << n),
                     rem_1 as $uD
-                )
+                )*/
+
+                // Example: 76543210 divided by 21 (using base 10 and n_h == 2 digits):
+                // Instead of calculating the fixed point reciprocal of a number by dividing a power
+                // of two (or in this example, a power of 10) by that number, we subtract 1 so that
+                // it can fit in a $uX and be the input of a half division.
+                //
+                // using 10^4 - 1 instead of 10^4
+                // `inv_hi == 9999 / 21 == 476`
+                // `inv_lo == (9999 % 21) + 1 == 4` (The increment here makes the whole inverse
+                // equivalent to 10000 / 21. If the increment results in the remainder being equal
+                // to the original divisor, then we know that `div_inv_hi` needs to be incremented
+                // and `div_inv_lo` set to 0)
+                //
+                // The whole inverse is equal to `(div_inv_lo * div_inv_hi) + (div_inv_hi * 10^4)`,
+                // which in this case is 4761904. Multiplying this whole inverse with 76543210 and
+                // dividing by 10^8 gives the correct quotient of 3644914, however this requires a
+                // multiplication larger than `$uD`.
+                //
+                //                                                           inv_hi           inv_lo
+                //                                                        *  duo_hi           duo_lo
+                //                                                       ___________________________
+                //                                                                x                x
+                //                                            +     x             x                0
+                //                                           _______________________________________
+                //
+                // duo*inv_hi + duo_hi*inv_lo
+                let div = div as $uH;
+                if div == 1 {
+                    // the inverse would be `1 << n` which would overflow things
+                    return (duo, 0);
+                }
+                // get undersubtraction and fit it in a half division
+                let (mut inv_hi, mut inv_hi_rem) = $half_division(!0, div as $uX);
+                inv_hi_rem += 1;
+                if inv_hi_rem == (div as $uX) {
+                    inv_hi += 1;
+                    inv_hi_rem = 0;
+                }
+                let inv_lo = inv_hi_rem.wrapping_mul(inv_hi);
+                let duo_lo = duo as $uX;
+                let duo_hi = (duo >> n) as $uX;
+                //            tmp4      _
+                // +   tmp2   tmp1   tmp0
+                // ______________________
+                //   quo_hi quo_lo      _
+                let (tmp0, carry) = carrying_mul(duo_lo, inv_hi);
+                let (tmp1, tmp2) = carrying_mul_add(duo_hi, inv_hi, carry);
+
+                let (_, tmp4) = carrying_mul_add(duo_hi, inv_lo, tmp0);
+                let quo = (tmp4 as $uD) + ((tmp1 as $uD) | ((tmp2 as $uD) << n));
+
+                let mul = quo.wrapping_mul(div as $uD);
+                let short = (duo - mul) as $uX;
+                let (quo_short, rem) = $half_division(short, div as $uX);
+                return ((quo_short as $uD) + quo, rem as $uD);
             }
 
             // relative leading significant bits, cannot overflow because of above branches

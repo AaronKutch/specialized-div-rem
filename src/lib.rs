@@ -13,7 +13,7 @@ extern crate rand;
 use rand::random;
 
 #[macro_use]
-mod misc;
+mod norm_shift;
 
 #[macro_use]
 mod binary_long;
