@@ -2,6 +2,7 @@ macro_rules! impl_asymmetric {
     (
         $unsigned_name:ident, // name of the unsigned division function
         $signed_name:ident, // name of the signed division function
+        $zero_div_fn:ident, // function called when division by zero is attempted
         $half_division:ident, // function for division of a $uX by a $uX
         $asymmetric_division:ident, // function for division of a $uD by a $uX
         $n_h:expr, // the number of bits in a $iH or $uH
@@ -50,7 +51,7 @@ macro_rules! impl_asymmetric {
             let div_hi = (div >> n) as $uX;
             if div_hi == 0 {
                 if div_lo == 0 {
-                    panic!("attempt to divide by zero");
+                    $zero_div_fn()
                 }
                 if duo_hi < div_lo {
                     // `$uD` by `$uX` division with a quotient that will fit into a `$uX`

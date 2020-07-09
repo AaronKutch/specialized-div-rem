@@ -33,6 +33,11 @@ mod extra;
 pub use extra::usize_leading_zeros;
 
 #[inline]
+fn zero_div_fn() -> ! {
+    panic!("attempt to divide by zero")
+}
+
+#[inline]
 fn u16_by_u16_div_rem(duo: u16, div: u16) -> (u16, u16) {
     (duo / div, duo % div)
 }
@@ -149,6 +154,7 @@ impl_normalization_shift!(u64_normalization_shift, USE_LZ, 64, u64, i64, inline)
 impl_binary_long!(
     u8_div_rem_binary_long,
     i8_div_rem_binary_long,
+    zero_div_fn,
     u8_normalization_shift,
     8,
     u8,
@@ -169,6 +175,7 @@ test!(
 impl_binary_long!(
     u16_div_rem_binary_long,
     i16_div_rem_binary_long,
+    zero_div_fn,
     u16_normalization_shift,
     16,
     u16,
@@ -189,6 +196,7 @@ test!(
 impl_binary_long!(
     u32_div_rem_binary_long,
     i32_div_rem_binary_long,
+    zero_div_fn,
     u32_normalization_shift,
     32,
     u32,
@@ -199,6 +207,7 @@ impl_binary_long!(
 impl_delegate!(
     u32_div_rem_delegate,
     i32_div_rem_delegate,
+    zero_div_fn,
     u16_normalization_shift,
     u16_by_u16_div_rem,
     8,
@@ -225,6 +234,7 @@ test!(
 impl_binary_long!(
     u64_div_rem_binary_long,
     i64_div_rem_binary_long,
+    zero_div_fn,
     u64_normalization_shift,
     64,
     u64,
@@ -235,6 +245,7 @@ impl_binary_long!(
 impl_delegate!(
     u64_div_rem_delegate,
     i64_div_rem_delegate,
+    zero_div_fn,
     u32_normalization_shift,
     u32_by_u32_div_rem,
     16,
@@ -248,6 +259,7 @@ impl_delegate!(
 impl_trifecta!(
     u64_div_rem_trifecta,
     i64_div_rem_trifecta,
+    zero_div_fn,
     u32_by_u32_div_rem,
     16,
     u16,
@@ -260,6 +272,7 @@ impl_trifecta!(
 impl_asymmetric!(
     u64_div_rem_asymmetric,
     i64_div_rem_asymmetric,
+    zero_div_fn,
     u32_by_u32_div_rem,
     u64_by_u32_div_rem,
     16,
@@ -292,6 +305,7 @@ test!(
 impl_delegate!(
     u128_div_rem_delegate,
     i128_div_rem_delegate,
+    zero_div_fn,
     u64_normalization_shift,
     u64_by_u64_div_rem,
     32,
@@ -305,6 +319,7 @@ impl_delegate!(
 impl_trifecta!(
     u128_div_rem_trifecta,
     i128_div_rem_trifecta,
+    zero_div_fn,
     u64_by_u64_div_rem,
     32,
     u32,
@@ -317,6 +332,7 @@ impl_trifecta!(
 impl_asymmetric!(
     u128_div_rem_asymmetric,
     i128_div_rem_asymmetric,
+    zero_div_fn,
     u64_by_u64_div_rem,
     u128_by_u64_div_rem,
     32,

@@ -2,6 +2,7 @@ macro_rules! impl_trifecta {
     (
         $unsigned_name:ident, // name of the unsigned division function
         $signed_name:ident, // name of the signed division function
+        $zero_div_fn:ident, // function called when division by zero is attempted
         $half_division:ident, // function for division of a $uX by a $uX
         $n_h:expr, // the number of bits in $iH or $uH
         $uH:ident, // unsigned integer with half the bit width of $uX
@@ -53,7 +54,7 @@ macro_rules! impl_trifecta {
             let n = $n_h * 2;
 
             if div == 0 {
-                panic!("attempt to divide by zero")
+                $zero_div_fn()
             }
 
             // Trying to use a normalization shift function will cause inelegancies in the code and

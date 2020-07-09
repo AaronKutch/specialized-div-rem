@@ -2,6 +2,7 @@ macro_rules! impl_binary_long {
     (
         $unsigned_name:ident, // name of the unsigned division function
         $signed_name:ident, // name of the signed division function
+        $zero_div_fn:ident, // function called when division by zero is attempted
         $normalization_shift:ident, // function for finding the normalization shift
         $n:tt, // the number of bits in a $iX or $uX
         $uX:ident, // unsigned integer type for the inputs and outputs of `$unsigned_name`
@@ -29,7 +30,7 @@ macro_rules! impl_binary_long {
             let mut duo = duo;
             // handle edge cases before calling `$normalization_shift`
             if div == 0 {
-                panic!("attempt to divide by zero")
+                $zero_div_fn()
             }
             if duo < div {
                 return (0, duo)

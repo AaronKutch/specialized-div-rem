@@ -2,6 +2,7 @@ macro_rules! impl_delegate {
     (
         $unsigned_name:ident, // name of the unsigned division function
         $signed_name:ident, // name of the signed division function
+        $zero_div_fn:ident, // function called when division by zero is attempted
         $half_normalization_shift:ident, // function for finding the normalization shift of $uX
         $half_division:ident, // function for division of a $uX by a $uX
         $n_h:expr, // the number of bits in $iH or $uH
@@ -41,7 +42,7 @@ macro_rules! impl_delegate {
 
             match (div_lo == 0, div_hi == 0, duo_hi == 0) {
                 (true, true, _) => {
-                    panic!("attempt to divide by zero")
+                    $zero_div_fn()
                 }
                 (_, false, true) => {
                     // `duo` < `div`
