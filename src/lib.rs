@@ -2,10 +2,11 @@
 // generate references to `memcpy` in unoptimized code. this code is intended to be used by
 // `compiler-builtins` which cannot use `memcpy`.
 
-#![feature(unsafe_block_in_unsafe_fn)]
-#![deny(unsafe_op_in_unsafe_fn)]
 #![cfg_attr(not(feature = "std"), no_std)]
 #![cfg_attr(feature = "asm", feature(asm))]
+
+// TODO: when `unsafe_block_in_unsafe_fn` is stabilized, remove this
+#![allow(unused_unsafe)]
 
 #[cfg(test)]
 extern crate rand;
