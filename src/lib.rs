@@ -44,6 +44,8 @@ fn u32_by_u32_div_rem(duo: u32, div: u32) -> (u32, u32) {
 #[cfg(any(not(feature = "asm"), not(target_arch = "x86")))]
 #[inline]
 unsafe fn u64_by_u32_div_rem(duo: u64, div: u32) -> (u32, u32) {
+    let duo_hi = (duo >> 32) as u32;
+    debug_assert!(duo_hi < div);
     ((duo / (div as u64)) as u32, (duo % (div as u64)) as u32)
 }
 
@@ -57,6 +59,7 @@ unsafe fn u64_by_u32_div_rem(duo: u64, div: u32) -> (u32, u32) {
 unsafe fn u64_by_u32_div_rem(duo: u64, div: u32) -> (u32, u32) {
     let duo_lo = duo as u32;
     let duo_hi = (duo >> 32) as u32;
+    debug_assert!(duo_hi < div);
     let quo: u32;
     let rem: u32;
     unsafe {
@@ -81,6 +84,8 @@ fn u64_by_u64_div_rem(duo: u64, div: u64) -> (u64, u64) {
 #[cfg(any(not(feature = "asm"), not(target_arch = "x86_64")))]
 #[inline]
 unsafe fn u128_by_u64_div_rem(duo: u128, div: u64) -> (u64, u64) {
+    let duo_hi = (duo >> 64) as u64;
+    debug_assert!(duo_hi < div);
     ((duo / (div as u128)) as u64, (duo % (div as u128)) as u64)
 }
 
@@ -94,6 +99,7 @@ unsafe fn u128_by_u64_div_rem(duo: u128, div: u64) -> (u64, u64) {
 unsafe fn u128_by_u64_div_rem(duo: u128, div: u64) -> (u64, u64) {
     let duo_lo = duo as u64;
     let duo_hi = (duo >> 64) as u64;
+    debug_assert!(duo_hi < div);
     let quo: u64;
     let rem: u64;
     unsafe {
