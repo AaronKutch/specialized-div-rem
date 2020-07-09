@@ -86,10 +86,10 @@ macro_rules! impl_trifecta {
             if duo_lz >= n {
                 // `duo < 2^n` so it will fit in a $uX. `div` will also fit in a $uX (because of the
                 // `div_lz <= duo_lz` branch) so no numerical error.
-                let tmp = $half_division(duo as $uX, div as $uX);
+                let (quo, rem) = $half_division(duo as $uX, div as $uX);
                 return (
-                    tmp.0 as $uD,
-                    tmp.1 as $uD
+                    quo as $uD,
+                    rem as $uD
                 )
             }
 
@@ -119,60 +119,43 @@ macro_rules! impl_trifecta {
                     rem_1 as $uD
                 )*/
 
-                // Example: 76543210 divided by 21 (using base 10 and n_h == 2 digits):
-                // Instead of calculating the fixed point reciprocal of a number by dividing a power
-                // of two (or in this example, a power of 10) by that number, we subtract 1 so that
-                // it can fit in a $uX and be the input of a half division.
-                //
-                // using 10^4 - 1 instead of 10^4
-                // `inv_hi == 9999 / 21 == 476`
-                // `inv_lo == (9999 % 21) + 1 == 4` (The increment here makes the whole inverse
-                // equivalent to 10000 / 21. If the increment results in the remainder being equal
-                // to the original divisor, then we know that `div_inv_hi` needs to be incremented
-                // and `div_inv_lo` set to 0)
-                //
-                // The whole inverse is equal to `(div_inv_lo * div_inv_hi) + (div_inv_hi * 10^4)`,
-                // which in this case is 4761904. Multiplying this whole inverse with 76543210 and
-                // dividing by 10^8 gives the correct quotient of 3644914, however this requires a
-                // multiplication larger than `$uD`.
-                //
-                //                                                           inv_hi           inv_lo
-                //                                                        *  duo_hi           duo_lo
-                //                                                       ___________________________
-                //                                                                x                x
-                //                                            +     x             x                0
-                //                                           _______________________________________
-                //
-                // duo*inv_hi + duo_hi*inv_lo
+                let mut duo = duo;
                 let div = div as $uH;
                 if div == 1 {
                     // the inverse would be `1 << n` which would overflow things
                     return (duo, 0);
                 }
                 // get undersubtraction and fit it in a half division
-                let (mut inv_hi, mut inv_hi_rem) = $half_division(!0, div as $uX);
-                inv_hi_rem += 1;
-                if inv_hi_rem == (div as $uX) {
-                    inv_hi += 1;
-                    inv_hi_rem = 0;
+                //let inv = $half_division(!0, div as $uX).0;
+                let (inv, inv_rem) = $half_division(!0, div as $uX);
+                /*if inv_rem + 1 == (div as $uX) {
+                    inv += 1;
+                }*/
+                let mut quo: $uD = 0;
+                loop {
+                    // The number of lesser significant bits not a part of `duo_sig_n`
+                    let duo_extra = n - duo_lz;
+
+                    // The most significant `n` bits of `duo`
+                    let duo_sig_n = (duo >> duo_extra) as $uX;
+                    let quo_sig_n = carrying_mul(duo_sig_n, inv).1;
+                    quo += (quo_sig_n as $uD) << duo_extra;
+                    duo -= (quo_sig_n.wrapping_mul(div as $uX) as $uD) << duo_extra;
+                    //println!("{duo}, {duo_sig_n}, {inv}, {quo_sig_n}, {duo_extra}, {quo}");
+                    duo_lz = duo.leading_zeros();
+                    if duo_lz >= n {
+                        let quo_sig_n = carrying_mul(duo as $uX, inv).1;
+                        quo += quo_sig_n as $uD;
+                        duo -= quo_sig_n.wrapping_mul(div as $uX) as $uD;
+                        // a `$uX` comparison needs to be made because of edge cases where
+                        // `duo == 1 << n_h`
+                        if (div as $uX) <= (duo as $uX) {
+                            quo += 1;
+                            duo -= div as $uD;
+                        }
+                        return (quo, duo);
+                    }
                 }
-                let inv_lo = inv_hi_rem.wrapping_mul(inv_hi);
-                let duo_lo = duo as $uX;
-                let duo_hi = (duo >> n) as $uX;
-                //            tmp4      _
-                // +   tmp2   tmp1   tmp0
-                // ______________________
-                //   quo_hi quo_lo      _
-                let (tmp0, carry) = carrying_mul(duo_lo, inv_hi);
-                let (tmp1, tmp2) = carrying_mul_add(duo_hi, inv_hi, carry);
-
-                let (_, tmp4) = carrying_mul_add(duo_hi, inv_lo, tmp0);
-                let quo = (tmp4 as $uD) + ((tmp1 as $uD) | ((tmp2 as $uD) << n));
-
-                let mul = quo.wrapping_mul(div as $uD);
-                let short = (duo - mul) as $uX;
-                let (quo_short, rem) = $half_division(short, div as $uX);
-                return ((quo_short as $uD) + quo, rem as $uD);
             }
 
             // relative leading significant bits, cannot overflow because of above branches
@@ -278,7 +261,7 @@ macro_rules! impl_trifecta {
                 // one correction needed, we can calculate the remainder `duo - (true_quo*div) ==
                 // duo - ((quo - 1)*div) == duo - (quo*div - div) == duo + div - quo*div`.
                 // If `duo - (quo*div)` did not overflow, then we have the correct answer.
-                let shift = n.wrapping_sub(duo_lz);
+                let shift = n - duo_lz;
                 let duo_sig_n = (duo >> shift) as $uX;
                 let div_sig_n = (div >> shift) as $uX;
                 let quo = $half_division(duo_sig_n, div_sig_n).0;
@@ -395,7 +378,7 @@ macro_rules! impl_trifecta {
             // `2^n_h <= div < {2^(duo_sb - n_h), 2^n}`
             loop {
                 // The number of lesser significant bits not a part of `duo_sig_n`
-                let duo_extra = n.wrapping_sub(duo_lz);
+                let duo_extra = n - duo_lz;
 
                 // The most significant `n` bits of `duo`
                 let duo_sig_n = (duo >> duo_extra) as $uX;
