@@ -98,7 +98,15 @@ macro_rules! impl_trifecta {
             // short division branch
             if div_lz >= (n + $n_h) {
                 // `1 <= div < {2^duo_sb, 2^n_h}`
-                /*let duo_hi = (duo >> n) as $uX;
+
+                // It is barely possible to improve the performance of this by calculating the
+                // reciprocal and removing one `$half_division`, but only if the CPU can do fast
+                // multiplications in parallel. Other reciprocal based methods can remove two
+                // `$half_division`s, but have multiplications that cannot be done in parallel and
+                // reduce performance. I have decided to use this trivial short division method and
+                // rely on the CPU having quick divisions.
+
+                let duo_hi = (duo >> n) as $uX;
                 let div_0 = div as $uH as $uX;
                 let (quo_hi, rem_3) = $half_division(duo_hi, div_0);
 
@@ -117,45 +125,7 @@ macro_rules! impl_trifecta {
                     | ((quo_1 as $uD) << $n_h)
                     | ((quo_hi as $uD) << n),
                     rem_1 as $uD
-                )*/
-
-                let mut duo = duo;
-                let div = div as $uH;
-                if div == 1 {
-                    // the inverse would be `1 << n` which would overflow things
-                    return (duo, 0);
-                }
-                // get undersubtraction and fit it in a half division
-                //let inv = $half_division(!0, div as $uX).0;
-                let (inv, inv_rem) = $half_division(!0, div as $uX);
-                /*if inv_rem + 1 == (div as $uX) {
-                    inv += 1;
-                }*/
-                let mut quo: $uD = 0;
-                loop {
-                    // The number of lesser significant bits not a part of `duo_sig_n`
-                    let duo_extra = n - duo_lz;
-
-                    // The most significant `n` bits of `duo`
-                    let duo_sig_n = (duo >> duo_extra) as $uX;
-                    let quo_sig_n = carrying_mul(duo_sig_n, inv).1;
-                    quo += (quo_sig_n as $uD) << duo_extra;
-                    duo -= (quo_sig_n.wrapping_mul(div as $uX) as $uD) << duo_extra;
-                    //println!("{duo}, {duo_sig_n}, {inv}, {quo_sig_n}, {duo_extra}, {quo}");
-                    duo_lz = duo.leading_zeros();
-                    if duo_lz >= n {
-                        let quo_sig_n = carrying_mul(duo as $uX, inv).1;
-                        quo += quo_sig_n as $uD;
-                        duo -= quo_sig_n.wrapping_mul(div as $uX) as $uD;
-                        // a `$uX` comparison needs to be made because of edge cases where
-                        // `duo == 1 << n_h`
-                        if (div as $uX) <= (duo as $uX) {
-                            quo += 1;
-                            duo -= div as $uD;
-                        }
-                        return (quo, duo);
-                    }
-                }
+                )
             }
 
             // relative leading significant bits, cannot overflow because of above branches
