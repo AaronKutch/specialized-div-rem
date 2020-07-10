@@ -52,32 +52,14 @@ macro_rules! bencher {
         $(
             #[bench]
             fn $test_name(bencher: &mut Bencher) {
-                let (a, b) = black_box({
-                    let n = std::$ty::MAX.count_ones();
-                    let (mut a, mut b): (Vec<$ty>, Vec<$ty>) = (Vec::new(), Vec::new());
-                    for _ in 0..8 {
-                        let tmp0: $ty = random();
-                        a.push(tmp0 & ($ty::MAX >> (n - $arg0_sb)));
-                        let tmp1: $ty = random();
-                        let tmp1 = tmp1 & ($ty::MAX >> (n - $arg1_sb));
-                        if tmp1 == 0 {
-                            // avoid division by zero
-                            b.push(1);
-                        } else {
-                            b.push(tmp1);
-                        }
-                    }
-                    (a, b)
-                });
+                let n = std::$ty::MAX.count_ones();
+                let lhs = random::<$ty>() & ($ty::MAX >> (n - $arg0_sb));
+                let mut rhs = random::<$ty>() & ($ty::MAX >> (n - $arg1_sb));
+                if rhs == 0 {
+                    rhs = 1;
+                }
                 bencher.iter(|| {
-                    let mut s0 = 0;
-                    let mut s1 = 0;
-                    for i in 0..a.len() {
-                        let tmp = $fn_div_rem(a[i], b[i]);
-                        s0 += tmp.0;
-                        s1 += tmp.1;
-                    }
-                    (s0, s1)
+                    black_box($fn_div_rem(black_box(lhs), black_box(rhs)))
                 })
             }
         )+

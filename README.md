@@ -33,8 +33,8 @@ the remainder (so it works as both the dividend and the remainder).
 
 ## Benchmarks
 
-When running `cargo bench` on this library with default features, it runs division operations 8
-times on an array of random numbers masked to benchmark different ranges of dividends and divisors.
+When running `cargo bench` on this library with default features, it runs division operations on
+random numbers masked to benchmark different ranges of dividends and divisors.
 
 The names of the benchmarks specify 4 things:
 
@@ -48,44 +48,38 @@ For example, the `u128_div_rem_96_70_asymmetric` benchmark tests how long it tak
 quotients and remainders of i128 random integers with the top 128 - 96 = 32 bits zeroed, divided
 by a u128 random integer with the top 128 - 70 = 58 bits zeroed, using the asymmetric algorithm.
 
-On an Intel i3-3240, the benchmarks look like this. This benchmark was run on Rust 1.41.0-nightly (412f43ac5 2019-11-24) with
-`set RUSTFLAGS=-C target-cpu=native` and `cargo bench --features=asm`:
+On an Intel i3-3240, the benchmarks look like this. This benchmark was run on Rust 1.46.0-nightly
+(8ac1525e0 2020-07-07) with default features:
 
 ```
-test i128_div_rem_96_32_asymmetric    ... bench:       1,008 ns/iter (+/- 21)
-test i128_div_rem_96_32_binary_long   ... bench:       4,887 ns/iter (+/- 1,355)
-test i128_div_rem_96_32_delegate      ... bench:         977 ns/iter (+/- 48)
-test i128_div_rem_96_32_std           ... bench:       6,739 ns/iter (+/- 2,184)
-test i128_div_rem_96_32_trifecta      ... bench:       1,088 ns/iter (+/- 170)
-test u128_div_rem_120_120_asymmetric  ... bench:         849 ns/iter (+/- 13)
-test u128_div_rem_120_120_binary_long ... bench:         301 ns/iter (+/- 76)
-test u128_div_rem_120_120_delegate    ... bench:         344 ns/iter (+/- 233)
-test u128_div_rem_120_120_std         ... bench:         808 ns/iter (+/- 22)
-test u128_div_rem_120_120_trifecta    ... bench:         469 ns/iter (+/- 241)
-test u128_div_rem_128_64_asymmetric   ... bench:       1,082 ns/iter (+/- 243)
-test u128_div_rem_128_64_delegate     ... bench:       7,013 ns/iter (+/- 330)
-test u128_div_rem_128_64_std          ... bench:       6,517 ns/iter (+/- 260)
-test u128_div_rem_128_64_trifecta     ... bench:       1,677 ns/iter (+/- 69)
-test u128_div_rem_128_8_asymmetric    ... bench:         987 ns/iter (+/- 44)
-test u128_div_rem_128_8_binary_long   ... bench:       8,761 ns/iter (+/- 282)
-test u128_div_rem_128_8_delegate      ... bench:         997 ns/iter (+/- 52)
-test u128_div_rem_128_8_std           ... bench:      11,070 ns/iter (+/- 1,262)
-test u128_div_rem_128_8_trifecta      ... bench:       1,160 ns/iter (+/- 324)
-test u128_div_rem_128_96_asymmetric   ... bench:       1,073 ns/iter (+/- 64)
-test u128_div_rem_128_96_binary_long  ... bench:       2,599 ns/iter (+/- 63)
-test u128_div_rem_128_96_delegate     ... bench:       2,345 ns/iter (+/- 154)
-test u128_div_rem_128_96_std          ... bench:       3,683 ns/iter (+/- 105)
-test u128_div_rem_128_96_trifecta     ... bench:       1,154 ns/iter (+/- 444)
-test u128_div_rem_96_32_asymmetric    ... bench:       1,004 ns/iter (+/- 236)
-test u128_div_rem_96_32_binary_long   ... bench:       4,902 ns/iter (+/- 510)
-test u128_div_rem_96_32_delegate      ... bench:         952 ns/iter (+/- 144)
-test u128_div_rem_96_32_std           ... bench:       6,935 ns/iter (+/- 2,460)
-test u128_div_rem_96_32_trifecta      ... bench:       1,111 ns/iter (+/- 322)
-test u128_div_rem_96_70_asymmetric    ... bench:         640 ns/iter (+/- 98)
-test u128_div_rem_96_70_binary_long   ... bench:       2,189 ns/iter (+/- 103)
-test u128_div_rem_96_70_delegate      ... bench:       1,876 ns/iter (+/- 1,584)
-test u128_div_rem_96_70_std           ... bench:       3,113 ns/iter (+/- 113)
-test u128_div_rem_96_70_trifecta      ... bench:         726 ns/iter (+/- 319)
-(the rest of the benchmarks are not included here because the algorithms are all not faster than the
-hardware divisions)
+test i128_div_rem_96_32_asymmetric   ... bench:          29 ns/iter (+/- 0)
+test i128_div_rem_96_32_delegate     ... bench:          32 ns/iter (+/- 5)
+test i128_div_rem_96_32_std          ... bench:         203 ns/iter (+/- 3)
+test i128_div_rem_96_32_trifecta     ... bench:          33 ns/iter (+/- 0)
+test u128_div_rem_120_120_asymmetric ... bench:          21 ns/iter (+/- 0)
+test u128_div_rem_120_120_delegate   ... bench:          16 ns/iter (+/- 0)
+test u128_div_rem_120_120_std        ... bench:          24 ns/iter (+/- 2)
+test u128_div_rem_120_120_trifecta   ... bench:          14 ns/iter (+/- 0)
+test u128_div_rem_128_64_asymmetric  ... bench:          37 ns/iter (+/- 1)
+test u128_div_rem_128_64_delegate    ... bench:          86 ns/iter (+/- 7)
+test u128_div_rem_128_64_std         ... bench:         218 ns/iter (+/- 62)
+test u128_div_rem_128_64_trifecta    ... bench:          61 ns/iter (+/- 1)
+test u128_div_rem_128_8_asymmetric   ... bench:          30 ns/iter (+/- 0)
+test u128_div_rem_128_8_delegate     ... bench:          31 ns/iter (+/- 2)
+test u128_div_rem_128_8_std          ... bench:         371 ns/iter (+/- 2)
+test u128_div_rem_128_8_trifecta     ... bench:          34 ns/iter (+/- 0)
+test u128_div_rem_128_96_asymmetric  ... bench:          41 ns/iter (+/- 0)
+test u128_div_rem_128_96_delegate    ... bench:          55 ns/iter (+/- 4)
+test u128_div_rem_128_96_std         ... bench:         119 ns/iter (+/- 0)
+test u128_div_rem_128_96_trifecta    ... bench:          43 ns/iter (+/- 1)
+test u128_div_rem_96_32_asymmetric   ... bench:          27 ns/iter (+/- 0)
+test u128_div_rem_96_32_delegate     ... bench:          54 ns/iter (+/- 1)
+test u128_div_rem_96_32_std          ... bench:         212 ns/iter (+/- 2)
+test u128_div_rem_96_32_trifecta     ... bench:          33 ns/iter (+/- 0)
+test u128_div_rem_96_70_asymmetric   ... bench:          21 ns/iter (+/- 0)
+test u128_div_rem_96_70_delegate     ... bench:          46 ns/iter (+/- 0)
+test u128_div_rem_96_70_std          ... bench:          97 ns/iter (+/- 0)
+test u128_div_rem_96_70_trifecta     ... bench:          24 ns/iter (+/- 0)
+(the rest of the benchmarks are not included here, because the 64 bit hardware divisions are always
+faster than the algorithms)
 ```
