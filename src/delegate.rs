@@ -1,3 +1,8 @@
+/// Creates unsigned and signed division functions that use a combination of hardware division and
+/// binary long division to divide integers larger than what hardware division by itself can do. This
+/// function is intended for microarchitectures that have division hardware, but not fast enough
+/// multiplication hardware for `impl_trifecta` to be faster.
+#[macro_export]
 macro_rules! impl_delegate {
     (
         $unsigned_name:ident, // name of the unsigned division function
@@ -15,10 +20,6 @@ macro_rules! impl_delegate {
     ) => {
         /// Computes the quotient and remainder of `duo` divided by `div` and returns them as a
         /// tuple.
-        ///
-        /// This uses binary long division, but if it can delegates work to a smaller division. This
-        /// function is intended for divisions of integers larger than the register size on CPUs
-        /// that do not have fast multiplication or division hardware.
         ///
         /// # Panics
         ///
@@ -202,10 +203,6 @@ macro_rules! impl_delegate {
 
         /// Computes the quotient and remainder of `duo` divided by `div` and returns them as a
         /// tuple.
-        ///
-        /// This uses binary long division, but if it can delegates work to a smaller division. This
-        /// function is intended for divisions of integers larger than the register size on CPUs
-        /// that do not have fast multiplication or division hardware.
         ///
         /// # Panics
         ///

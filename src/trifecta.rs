@@ -1,3 +1,8 @@
+/// Creates unsigned and signed division functions optimized for division of integers with bitwidths
+/// larger than the largest hardware integer division supported. These functions use large radix
+/// division algorithms that require both fast division and very fast widening multiplication on the
+/// target microarchitecture. Otherwise, `impl_delegate` should be used instead.
+#[macro_export]
 macro_rules! impl_trifecta {
     (
         $unsigned_name:ident, // name of the unsigned division function
@@ -15,21 +20,6 @@ macro_rules! impl_trifecta {
         /// Computes the quotient and remainder of `duo` divided by `div` and returns them as a
         /// tuple.
         ///
-        /// This is optimized for division of two integers with bit widths twice as large
-        /// as the largest hardware integer division supported. Note that some architectures supply
-        /// a division of an integer larger than register size by a regular sized integer (e.x.
-        /// x86_64 has an assembly instruction which can divide a 128 bit integer by a 64 bit
-        /// integer). In that case, the `_asymmetric` algorithm should be used instead of this one.
-        ///
-        /// Note that sometimes, CPUs can have hardware division, but it is implemented in a way
-        /// that is not significantly faster than custom binary long division, and/or the hardware
-        /// multiplier is so slow that the alternative `_delegate` algorithm is faster. `_trifecta`
-        /// depends on both the divider and multplier being fast.
-        ///
-        /// This is called the trifecta algorithm because it uses three main algorithms: short
-        /// division for small divisors, the two possibility algorithm for large divisors, and an
-        /// undersubtracting long division algorithm for intermediate cases.
-        ///
         /// # Panics
         ///
         /// When attempting to divide by zero, this function will panic.
@@ -37,6 +27,10 @@ macro_rules! impl_trifecta {
             #[$unsigned_attr]
         )*
         pub fn $unsigned_name(duo: $uD, div: $uD) -> ($uD, $uD) {
+            // This is called the trifecta algorithm because it uses three main algorithms: short
+            // division for small divisors, the two possibility algorithm for large divisors, and an
+            // undersubtracting long division algorithm for intermediate cases.
+
             // This replicates `carrying_mul` (rust-lang rfc #2417). LLVM correctly optimizes this
             // to use a widening multiply to 128 bits on the relevant architectures.
             #[inline]
@@ -426,21 +420,6 @@ macro_rules! impl_trifecta {
 
         /// Computes the quotient and remainder of `duo` divided by `div` and returns them as a
         /// tuple.
-        ///
-        /// This is optimized for division of two integers with bit widths twice as large
-        /// as the largest hardware integer division supported. Note that some architectures supply
-        /// a division of an integer larger than register size by a regular sized integer (e.x.
-        /// x86_64 has an assembly instruction which can divide a 128 bit integer by a 64 bit
-        /// integer). In that case, the `_asymmetric` algorithm should be used instead of this one.
-        ///
-        /// Note that sometimes, CPUs can have hardware division, but it is implemented in a way
-        /// that is not significantly faster than custom binary long division, and/or the hardware
-        /// multiplier is so slow that the alternative `_delegate` algorithm is faster. `_trifecta`
-        /// depends on both the divider and multplier being fast.
-        ///
-        /// This is called the trifecta algorithm because it uses three main algorithms: short
-        /// division for small divisors, the two possibility algorithm for large divisors, and an
-        /// undersubtracting long division algorithm for intermediate cases.
         ///
         /// # Panics
         ///

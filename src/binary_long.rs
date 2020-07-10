@@ -1,3 +1,10 @@
+/// Creates unsigned and signed division functions that use binary long division, designed for
+/// computer architectures without division instructions. These functions have good performance for
+/// microarchitectures with large branch miss penalties and architectures without the ability to
+/// predicate instructions. For architectures with predicated instructions, one of the algorithms
+/// described in the documentation of these functions probably has higher performance, and a custom
+/// assembly routine should be used instead.
+#[macro_export]
 macro_rules! impl_binary_long {
     (
         $unsigned_name:ident, // name of the unsigned division function
@@ -12,13 +19,6 @@ macro_rules! impl_binary_long {
     ) => {
         /// Computes the quotient and remainder of `duo` divided by `div` and returns them as a
         /// tuple.
-        ///
-        /// This uses binary long division with no calls to smaller divisions, and is designed for
-        /// CPUs without fast division hardware. The algorithm used has good performance for CPUs
-        /// with large branch miss penalties and computer architectures without predicated
-        /// instructions. For architectures with predicated instructions, one of the algorithms
-        /// described in the documentation of this function probably has higher performance, and a
-        /// custom assembly routine should be used.
         ///
         /// # Panics
         ///
@@ -557,13 +557,6 @@ macro_rules! impl_binary_long {
 
         /// Computes the quotient and remainder of `duo` divided by `div` and returns them as a
         /// tuple.
-        ///
-        /// This uses binary long division with no calls to smaller divisions, and is designed for
-        /// CPUs without fast division hardware. The algorithm used has good performance for CPUs
-        /// with large branch miss penalties and computer architectures without predicated
-        /// instructions. For architectures with predicated instructions, one of the algorithms
-        /// described in the documentation of this function probably has higher performance, and a
-        /// custom assembly routine should be used.
         ///
         /// # Panics
         ///

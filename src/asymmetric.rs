@@ -1,3 +1,9 @@
+/// Creates unsigned and signed division functions optimized for dividing integers with the same
+/// bitwidth as the largest operand in an asymmetrically sized division. For example, x86-64 has an
+/// assembly instruction that can divide a 128 bit integer by a 64 bit integer if the quotient fits
+/// in 64 bits. The 128 bit version of this algorithm would use that fast hardware division to
+/// construct a full 128 bit by 128 bit division.
+#[macro_export]
 macro_rules! impl_asymmetric {
     (
         $unsigned_name:ident, // name of the unsigned division function
@@ -15,12 +21,6 @@ macro_rules! impl_asymmetric {
     ) => {
         /// Computes the quotient and remainder of `duo` divided by `div` and returns them as a
         /// tuple.
-        ///
-        /// This is optimized for dividing integers with the same bitwidth as the largest operand in
-        /// an asymmetrically sized division. For example, x86-64 has an assembly instruction that
-        /// can divide a 128 bit integer by a 64 bit integer if the quotient fits in 64 bits. The
-        /// 128 bit version of this algorithm would use that fast hardware division to construct a
-        /// full 128 bit by 128 bit division.
         ///
         /// # Panics
         ///
@@ -148,12 +148,6 @@ macro_rules! impl_asymmetric {
 
         /// Computes the quotient and remainder of `duo` divided by `div` and returns them as a
         /// tuple.
-        ///
-        /// This is optimized for dividing integers with the same bitwidth as the largest operand in
-        /// an asymmetrically sized division. For example, x86-64 has an assembly instruction that
-        /// can divide a 128 bit integer by a 64 bit integer if the quotient fits in 64 bits. The
-        /// 128 bit version of this algorithm would use that fast hardware division to construct a
-        /// full 128 bit by 128 bit division.
         ///
         /// # Panics
         ///

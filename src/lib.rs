@@ -4,7 +4,6 @@
 
 #![cfg_attr(not(feature = "std"), no_std)]
 #![cfg_attr(feature = "asm", feature(asm))]
-
 // TODO: when `unsafe_block_in_unsafe_fn` is stabilized, remove this
 #![allow(unused_unsafe)]
 
