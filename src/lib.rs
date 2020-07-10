@@ -12,6 +12,12 @@ extern crate rand;
 #[cfg(test)]
 use rand::random;
 
+mod leading_zeros;
+pub use leading_zeros::usize_leading_zeros;
+
+#[macro_use]
+mod test;
+
 #[macro_use]
 mod norm_shift;
 
@@ -26,10 +32,6 @@ mod trifecta;
 
 #[macro_use]
 mod asymmetric;
-
-#[macro_use]
-mod extra;
-pub use extra::usize_leading_zeros;
 
 #[inline]
 fn zero_div_fn() -> ! {
