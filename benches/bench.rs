@@ -4,7 +4,6 @@ extern crate test;
 use rand::prelude::*;
 use test::{black_box, Bencher};
 
-extern crate specialized_div_rem;
 use specialized_div_rem::*;
 
 /// Calculates `specialized_div_rem::leading_zeros` 32 times with randomized operands with a random

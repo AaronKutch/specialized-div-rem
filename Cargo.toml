@@ -1,25 +1,29 @@
 [package]
 name = "specialized-div-rem"
 version = "0.3.0"
-edition = "2018"
 authors = ["Aaron Kutch <aaronkutch@att.net>"]
+edition = "2018"
 
 description = "specialized division algorithms for integer primitives"
-repository = "https://github.com/AaronKutch/specialized-div-rem"
 documentation = "https://docs.rs/specialized-div-rem"
 readme = "README.md"
+repository = "https://github.com/AaronKutch/specialized-div-rem"
+license = "MIT OR Apache-2.0"
 keywords = ["division", "int", "integer", "numerics", "math"]
 categories = ["algorithms", "no-std"]
-license = "MIT OR Apache-2.0"
 
 [features]
-default = ["asm", "std"]
+default = ["asm", "implement", "std"]
 # assembly is so critical to the performance of some algorithms that it should be the default
 asm = []
+# Causes this crate to implement many functions and tests using the macros. Required for running
+# tests or benches.
+implement = []
+# Forces using software normalization instead of using `leading_zeros` for the functions implemented
+# when the "implement" flag is set.
+no_lz = []
 # this is needed for benchmarks and the `println!` in tests
 std = []
-# forces using software normalization instead of using `leading_zeros`, for testing purposes
-no_lz = []
 
 [dev-dependencies]
 # for random numbers in benchmarks

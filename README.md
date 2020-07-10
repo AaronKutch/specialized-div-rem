@@ -15,9 +15,10 @@ This crate provides the algorithms, tests, and benchmarks for four different div
 - The `_asymmetric` functions similar to the `_trifecta` functions, except optimized for CPUs with
   an asymmetric sized hardware division function such as x86_64's division instruction
 
-Note that setting the the `asm` feature flag can cause a significant performance improvement for
-these functions, and is absolutely required for `_asymmetric` to work efficiently. The `std` flag is
-only needed for benchmarks and tests.
+Without any default features on, this crate is in `no_std` mode and only exports macros. When the
+`implement` and `std` flags are on, this crate uses its macros to implement a wide arrangement of
+division functions for usage in tests and benchmarks. Note that setting the the `asm` feature flag
+is absolutely required for `_asymmetric` to work efficiently.
 
 Most division algorithms end up doing most of the work to get both the quotient and remainder, which
 is why these functions return both (and the compiler can inline and optimize away unused results and
@@ -32,21 +33,20 @@ the remainder (so it works as both the dividend and the remainder).
 
 ## Benchmarks
 
-When running `cargo bench` on this library, it runs division operations 32 times on an array of
-random numbers masked to benchmark different ranges of dividends and divisors.
+When running `cargo bench` on this library with default features, it runs division operations 8
+times on an array of random numbers masked to benchmark different ranges of dividends and divisors.
 
 The names of the benchmarks specify 4 things:
 
     - the type of integer being operated on
-    - whether the quotient (`_div`) or remainder (`_rem`) or both (`div_rem`) are calculated
     - the size of the numbers being entered (specifically, how many lower bits of the random integer
       are being kept)
     - the kind of algorithm. Whatever Rust's `/` and `%` operators are using is benchmarked by
       the `_std` benches.
 
-For example, the `u128_div_rem_126_64_asymmetric` benchmark tests how long it takes to find 32
-quotients and remainders of a u128 random integer with the top 128 - 126 = 2 bits zeroed, divided
-by a u128 random integer with the top 128 - 64 = 64 bits zeroed, using the asymmetric algorithm.
+For example, the `u128_div_rem_96_70_asymmetric` benchmark tests how long it takes to find the
+quotients and remainders of i128 random integers with the top 128 - 96 = 32 bits zeroed, divided
+by a u128 random integer with the top 128 - 70 = 58 bits zeroed, using the asymmetric algorithm.
 
 On an Intel i3-3240, the benchmarks look like this. This benchmark was run on Rust 1.41.0-nightly (412f43ac5 2019-11-24) with
 `set RUSTFLAGS=-C target-cpu=native` and `cargo bench --features=asm`:
