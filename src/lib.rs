@@ -5,9 +5,6 @@
 #![cfg_attr(not(feature = "std"), no_std)]
 #![cfg_attr(feature = "asm", feature(asm))]
 
-mod leading_zeros;
-pub use leading_zeros::usize_leading_zeros;
-
 #[macro_use]
 mod test;
 
