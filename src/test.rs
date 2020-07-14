@@ -22,8 +22,8 @@ macro_rules! test {
                             rhs,
                             lhs.wrapping_div(rhs),
                             lhs.wrapping_rem(rhs),
-                            $unsigned_name(lhs, rhs).0,
-                            $unsigned_name(lhs, rhs).1
+                            quo,
+                            rem
                         );
                     }
 
@@ -53,8 +53,8 @@ macro_rules! test {
                             rhs,
                             lhs.wrapping_div(rhs),
                             lhs.wrapping_rem(rhs),
-                            $signed_name(lhs, rhs).0,
-                            $signed_name(lhs, rhs).1
+                            quo,
+                            rem
                         );
                     }
                 }
