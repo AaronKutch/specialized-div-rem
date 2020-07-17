@@ -19,10 +19,6 @@ macro_rules! impl_trifecta {
     ) => {
         /// Computes the quotient and remainder of `duo` divided by `div` and returns them as a
         /// tuple.
-        ///
-        /// # Panics
-        ///
-        /// When attempting to divide by zero, this function will panic.
         $(
             #[$unsigned_attr]
         )*
@@ -418,10 +414,6 @@ macro_rules! impl_trifecta {
 
         /// Computes the quotient and remainder of `duo` divided by `div` and returns them as a
         /// tuple.
-        ///
-        /// # Panics
-        ///
-        /// When attempting to divide by zero, this function will panic.
         $(
             #[$signed_attr]
         )*
