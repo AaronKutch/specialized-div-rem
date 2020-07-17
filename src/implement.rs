@@ -28,7 +28,8 @@ unsafe fn u64_by_u32_div_rem(duo: u64, div: u32) -> (u32, u32) {
 ///
 /// # Safety
 ///
-/// If the quotient does not fit in a `u32`, or `div == 0`, a floating point exception occurs.
+/// If the quotient does not fit in a `u32`, a floating point exception occurs.
+/// If `div == 0`, then a division by zero exception occurs.
 #[cfg(all(feature = "asm", target_arch = "x86"))]
 #[inline]
 unsafe fn u64_by_u32_div_rem(duo: u64, div: u32) -> (u32, u32) {
@@ -68,7 +69,8 @@ unsafe fn u128_by_u64_div_rem(duo: u128, div: u64) -> (u64, u64) {
 ///
 /// # Safety
 ///
-/// If the quotient does not fit in a `u64`, or `div == 0`, a floating point exception occurs.
+/// If the quotient does not fit in a `u64`, a floating point exception occurs.
+/// If `div == 0`, then a division by zero exception occurs.
 #[cfg(all(feature = "asm", target_arch = "x86_64"))]
 #[inline]
 unsafe fn u128_by_u64_div_rem(duo: u128, div: u64) -> (u64, u64) {
