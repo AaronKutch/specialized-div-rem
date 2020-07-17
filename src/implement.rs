@@ -1,23 +1,19 @@
 // TODO: when `unsafe_block_in_unsafe_fn` is stabilized, remove this
 #![allow(unused_unsafe)]
 
-#[inline]
 fn zero_div_fn() -> ! {
     panic!("attempt to divide by zero")
 }
 
-#[inline]
 fn u16_by_u16_div_rem(duo: u16, div: u16) -> (u16, u16) {
     (duo / div, duo % div)
 }
 
-#[inline]
 fn u32_by_u32_div_rem(duo: u32, div: u32) -> (u32, u32) {
     (duo / div, duo % div)
 }
 
 #[cfg(any(not(feature = "asm"), not(target_arch = "x86")))]
-#[inline]
 unsafe fn u64_by_u32_div_rem(duo: u64, div: u32) -> (u32, u32) {
     let duo_hi = (duo >> 32) as u32;
     debug_assert!(duo_hi < div);
@@ -31,7 +27,6 @@ unsafe fn u64_by_u32_div_rem(duo: u64, div: u32) -> (u32, u32) {
 /// If the quotient does not fit in a `u32`, a floating point exception occurs.
 /// If `div == 0`, then a division by zero exception occurs.
 #[cfg(all(feature = "asm", target_arch = "x86"))]
-#[inline]
 unsafe fn u64_by_u32_div_rem(duo: u64, div: u32) -> (u32, u32) {
     let duo_lo = duo as u32;
     let duo_hi = (duo >> 32) as u32;
@@ -52,13 +47,11 @@ unsafe fn u64_by_u32_div_rem(duo: u64, div: u32) -> (u32, u32) {
     (quo, rem)
 }
 
-#[inline]
 fn u64_by_u64_div_rem(duo: u64, div: u64) -> (u64, u64) {
     (duo / div, duo % div)
 }
 
 #[cfg(any(not(feature = "asm"), not(target_arch = "x86_64")))]
-#[inline]
 unsafe fn u128_by_u64_div_rem(duo: u128, div: u64) -> (u64, u64) {
     let duo_hi = (duo >> 64) as u64;
     debug_assert!(duo_hi < div);
@@ -72,7 +65,6 @@ unsafe fn u128_by_u64_div_rem(duo: u128, div: u64) -> (u64, u64) {
 /// If the quotient does not fit in a `u64`, a floating point exception occurs.
 /// If `div == 0`, then a division by zero exception occurs.
 #[cfg(all(feature = "asm", target_arch = "x86_64"))]
-#[inline]
 unsafe fn u128_by_u64_div_rem(duo: u128, div: u64) -> (u64, u64) {
     let duo_lo = duo as u64;
     let duo_hi = (duo >> 64) as u64;
@@ -101,10 +93,10 @@ const USE_LZ: bool = false;
 #[cfg(not(any(feature = "no_lz", target_arch = "riscv32", target_arch = "riscv64")))]
 const USE_LZ: bool = true;
 
-impl_normalization_shift!(u8_normalization_shift, USE_LZ, 8, u8, i8, inline);
-impl_normalization_shift!(u16_normalization_shift, USE_LZ, 16, u16, i16, inline);
-impl_normalization_shift!(u32_normalization_shift, USE_LZ, 32, u32, i32, inline);
-impl_normalization_shift!(u64_normalization_shift, USE_LZ, 64, u64, i64, inline);
+impl_normalization_shift!(u8_normalization_shift, USE_LZ, 8, u8, i8,);
+impl_normalization_shift!(u16_normalization_shift, USE_LZ, 16, u16, i16,);
+impl_normalization_shift!(u32_normalization_shift, USE_LZ, 32, u32, i32,);
+impl_normalization_shift!(u64_normalization_shift, USE_LZ, 64, u64, i64,);
 
 // Note: one reason for the macros having a `$half_division:ident` instead of directly calling the
 // `/` and `%` builtin operators is that allows using different algorithms for the half
@@ -121,6 +113,9 @@ impl_normalization_shift!(u64_normalization_shift, USE_LZ, 64, u64, i64, inline)
 // faster algorithms for 8 bit and 16 bit divisions probably exist. However, the smallest division
 // in `compiler-builtins` is 32 bits, so these cases are only left in for testing purposes.
 
+// Inlining is only done on the signed function in order to encourage optimal branching if LLVM
+// knows that one or both inputs cannot be negative.
+
 // 8 bit
 impl_binary_long!(
     u8_div_rem_binary_long,
@@ -129,8 +124,7 @@ impl_binary_long!(
     u8_normalization_shift,
     8,
     u8,
-    i8,
-    inline;
+    i8,;
     inline
 );
 
@@ -142,8 +136,7 @@ impl_binary_long!(
     u16_normalization_shift,
     16,
     u16,
-    i16,
-    inline;
+    i16,;
     inline
 );
 
@@ -155,8 +148,7 @@ impl_binary_long!(
     u32_normalization_shift,
     32,
     u32,
-    i32,
-    inline;
+    i32,;
     inline
 );
 impl_delegate!(
@@ -169,8 +161,7 @@ impl_delegate!(
     u8,
     u16,
     u32,
-    i32,
-    inline;
+    i32,;
     inline
 );
 
@@ -182,8 +173,7 @@ impl_binary_long!(
     u64_normalization_shift,
     64,
     u64,
-    i64,
-    inline;
+    i64,;
     inline
 );
 impl_delegate!(
@@ -196,8 +186,7 @@ impl_delegate!(
     u16,
     u32,
     u64,
-    i64,
-    inline;
+    i64,;
     inline
 );
 impl_trifecta!(
@@ -209,8 +198,7 @@ impl_trifecta!(
     u16,
     u32,
     u64,
-    i64,
-    inline;
+    i64,;
     inline
 );
 impl_asymmetric!(
@@ -223,8 +211,7 @@ impl_asymmetric!(
     u16,
     u32,
     u64,
-    i64,
-    inline;
+    i64,;
     inline
 );
 
@@ -239,8 +226,7 @@ impl_delegate!(
     u32,
     u64,
     u128,
-    i128,
-    inline;
+    i128,;
     inline
 );
 impl_trifecta!(
@@ -252,8 +238,7 @@ impl_trifecta!(
     u32,
     u64,
     u128,
-    i128,
-    inline;
+    i128,;
     inline
 );
 impl_asymmetric!(
@@ -266,7 +251,6 @@ impl_asymmetric!(
     u32,
     u64,
     u128,
-    i128,
-    inline;
+    i128,;
     inline
 );

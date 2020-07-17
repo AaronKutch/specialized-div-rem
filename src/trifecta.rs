@@ -33,12 +33,10 @@ macro_rules! impl_trifecta {
 
             // This replicates `carrying_mul` (rust-lang rfc #2417). LLVM correctly optimizes this
             // to use a widening multiply to 128 bits on the relevant architectures.
-            #[inline]
             fn carrying_mul(lhs: $uX, rhs: $uX) -> ($uX, $uX) {
                 let tmp = (lhs as $uD).wrapping_mul(rhs as $uD);
                 (tmp as $uX, (tmp >> ($n_h * 2)) as $uX)
             }
-            #[inline]
             fn carrying_mul_add(lhs: $uX, mul: $uX, add: $uX) -> ($uX, $uX) {
                 let tmp = (lhs as $uD).wrapping_mul(mul as $uD).wrapping_add(add as $uD);
                 (tmp as $uX, (tmp >> ($n_h * 2)) as $uX)

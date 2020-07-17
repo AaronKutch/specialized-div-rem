@@ -565,9 +565,8 @@ macro_rules! impl_binary_long {
             #[$signed_attr]
         )*
         pub fn $signed_name(duo: $iX, div: $iX) -> ($iX, $iX) {
-            // There is a way of doing this without any branches, but the branching method below
-            // requires several fewer operations, and compilers can easily inline particular
-            // branches if it knows some inputs will never be negative.
+            // There is a way of doing this without any branches, but requires too many extra
+            // operations to be faster.
             /*
             let duo_s = duo >> ($n - 1);
             let div_s = div >> ($n - 1);
