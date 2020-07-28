@@ -85,12 +85,25 @@ unsafe fn u128_by_u64_div_rem(duo: u128, div: u64) -> (u64, u64) {
     (quo, rem)
 }
 
-// TODO: if Rust adds a way to check for the "B" extension on RISC-V, then modify this
-#[cfg(any(feature = "no_lz", target_arch = "riscv32", target_arch = "riscv64"))]
-const USE_LZ: bool = false;
+// The `B` extension on RISC-V determines if a CLZ assembly instruction exists
+#[cfg(any(target_arch = "riscv32", target_arch = "riscv64"))]
+const USE_LZ: bool = cfg!(target_feature = "b");
 
-// The rest of the common architectures supply `leading_zeros`
-#[cfg(not(any(feature = "no_lz", target_arch = "riscv32", target_arch = "riscv64")))]
+#[cfg(target_arch = "arm")]
+const USE_LZ: bool = if cfg!(target_feature = "thumb-mode") {
+    // ARM thumb targets have CLZ instructions if the instruction set of ARMv6T2 is supported. This
+    // is needed to successfully differentiate between targets like `thumbv8.base` and
+    // `thumbv8.main`.
+    cfg!(target_feature = "v6t2")
+} else {
+    // Regular ARM targets have CLZ instructions if the ARMv5TE instruction set is supported.
+    // Technically, ARMv5T was the first to have CLZ, but the "v5t" target feature does not seem to
+    // work.
+    cfg!(target_feature = "v5te")
+};
+
+// All other targets Rust supports have CLZ instructions
+#[cfg(not(any(target_arch = "arm", target_arch = "riscv32", target_arch = "riscv64")))]
 const USE_LZ: bool = true;
 
 impl_normalization_shift!(u8_normalization_shift, USE_LZ, 8, u8, i8,);
