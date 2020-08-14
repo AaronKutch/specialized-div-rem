@@ -1,7 +1,9 @@
 # Specialized Division and Remainder Algorithms
 
 This crate is not intended for direct use, but for use in parts of compilers (such as
-`compiler-builtins`), so that all division code can benefit.
+`compiler-builtins`), so that all division code can benefit. However, this crate might find use
+for cases where control over inlining is needed (e.g. see the `u128_div_asymmetric` function which
+uses inlining to remove instructions only needed for calculating the remainder).
 
 This crate provides the algorithms, tests, and benchmarks for four different division functions:
 

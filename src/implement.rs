@@ -281,3 +281,29 @@ impl_asymmetric!(
     inline(never);
     inline
 );
+
+// Demonstrate inlining to eliminate unused instructions for quotient-only computation
+mod inliner {
+    use super::*;
+
+    impl_asymmetric!(
+        u128_div_rem_asymmetric_inline,
+        _unused,
+        zero_div_fn,
+        u64_by_u64_div_rem,
+        u128_by_u64_div_rem,
+        32,
+        u32,
+        u64,
+        u128,
+        i128,
+        inline(always);
+    );
+
+    /// Returns the quotient of `duo` divided by `div`
+    pub fn u128_div_asymmetric(duo: u128, div: u128) -> u128 {
+        u128_div_rem_asymmetric_inline(duo, div).0
+    }
+}
+
+pub use inliner::u128_div_asymmetric;

@@ -26,6 +26,7 @@ use specialized_div_rem::{
     i128_div_rem_trifecta,
     u128_div_rem_asymmetric,
     i128_div_rem_asymmetric,
+    u128_div_asymmetric,
 };
 
 test!(
@@ -111,3 +112,8 @@ test_div_by_zero!(
     dbz20, u128_div_rem_asymmetric;
     dbz21, i128_div_rem_asymmetric;
 );
+
+#[test]
+fn sanity_test() {
+    assert_eq!(u128_div_asymmetric(1337 << 63, 42), 293610676506543696554);
+}
