@@ -1,6 +1,6 @@
 [package]
 name = "specialized-div-rem"
-version = "0.3.0"
+version = "1.0.0"
 authors = ["Aaron Kutch <aaronkutch@att.net>"]
 edition = "2018"
 
