@@ -140,3 +140,20 @@ macro_rules! test {
         )+
     }
 }
+
+/// Creates test functions for asserting that division by zero causes a panic
+#[macro_export]
+macro_rules! test_div_by_zero {
+    (
+        // list of tuples of the test name and function name
+        $($test_name:ident, $fn:ident);+;
+    ) => {
+        $(
+            #[test]
+            #[should_panic]
+            fn $test_name() {
+                $fn(1, 0);
+            }
+        )+
+    }
+}

@@ -3,6 +3,7 @@ use rand::random;
 #[rustfmt::skip]
 use specialized_div_rem::{
     test,
+    test_div_by_zero,
     u8_div_rem_binary_long,
     i8_div_rem_binary_long,
     u16_div_rem_binary_long,
@@ -84,4 +85,29 @@ test!(
     div_rem_asymmetric_128,
     u128_div_rem_asymmetric,
     i128_div_rem_asymmetric;
+);
+
+test_div_by_zero!(
+    dbz0, u8_div_rem_binary_long;
+    dbz1, i8_div_rem_binary_long;
+    dbz2, u16_div_rem_binary_long;
+    dbz3, i16_div_rem_binary_long;
+    dbz4, u32_div_rem_binary_long;
+    dbz5, i32_div_rem_binary_long;
+    dbz6, u32_div_rem_delegate;
+    dbz7, i32_div_rem_delegate;
+    dbz8, u64_div_rem_binary_long;
+    dbz9, i64_div_rem_binary_long;
+    dbz10, u64_div_rem_delegate;
+    dbz11, i64_div_rem_delegate;
+    dbz12, u64_div_rem_trifecta;
+    dbz13, i64_div_rem_trifecta;
+    dbz14, u64_div_rem_asymmetric;
+    dbz15, i64_div_rem_asymmetric;
+    dbz16, u128_div_rem_delegate;
+    dbz17, i128_div_rem_delegate;
+    dbz18, u128_div_rem_trifecta;
+    dbz19, i128_div_rem_trifecta;
+    dbz20, u128_div_rem_asymmetric;
+    dbz21, i128_div_rem_asymmetric;
 );
