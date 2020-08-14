@@ -127,7 +127,10 @@ impl_normalization_shift!(u64_normalization_shift, USE_LZ, 64, u64, i64,);
 // in `compiler-builtins` is 32 bits, so these cases are only left in for testing purposes.
 
 // Inlining is only done on the signed function in order to encourage optimal branching if LLVM
-// knows that one or both inputs cannot be negative.
+// knows that one or both inputs cannot be negative. `inline(never)` is applied to the unsigned
+// functions to prevent cases where LLVM will try to inline the unsigned division function an entire
+// 4 times into the 4 branches of the signed function implementations. Inlining the unsigned
+// division functions results in huge code bloat.
 
 // 8 bit
 impl_binary_long!(
@@ -137,7 +140,8 @@ impl_binary_long!(
     u8_normalization_shift,
     8,
     u8,
-    i8,;
+    i8,
+    inline(never);
     inline
 );
 
@@ -149,7 +153,8 @@ impl_binary_long!(
     u16_normalization_shift,
     16,
     u16,
-    i16,;
+    i16,
+    inline(never);
     inline
 );
 
@@ -161,7 +166,8 @@ impl_binary_long!(
     u32_normalization_shift,
     32,
     u32,
-    i32,;
+    i32,
+    inline(never);
     inline
 );
 impl_delegate!(
@@ -174,7 +180,8 @@ impl_delegate!(
     u8,
     u16,
     u32,
-    i32,;
+    i32,
+    inline(never);
     inline
 );
 
@@ -186,7 +193,8 @@ impl_binary_long!(
     u64_normalization_shift,
     64,
     u64,
-    i64,;
+    i64,
+    inline(never);
     inline
 );
 impl_delegate!(
@@ -199,7 +207,8 @@ impl_delegate!(
     u16,
     u32,
     u64,
-    i64,;
+    i64,
+    inline(never);
     inline
 );
 impl_trifecta!(
@@ -211,7 +220,8 @@ impl_trifecta!(
     u16,
     u32,
     u64,
-    i64,;
+    i64,
+    inline(never);
     inline
 );
 impl_asymmetric!(
@@ -224,7 +234,8 @@ impl_asymmetric!(
     u16,
     u32,
     u64,
-    i64,;
+    i64,
+    inline(never);
     inline
 );
 
@@ -239,7 +250,8 @@ impl_delegate!(
     u32,
     u64,
     u128,
-    i128,;
+    i128,
+    inline(never);
     inline
 );
 impl_trifecta!(
@@ -251,7 +263,8 @@ impl_trifecta!(
     u32,
     u64,
     u128,
-    i128,;
+    i128,
+    inline(never);
     inline
 );
 impl_asymmetric!(
@@ -264,6 +277,7 @@ impl_asymmetric!(
     u32,
     u64,
     u128,
-    i128,;
+    i128,
+    inline(never);
     inline
 );
