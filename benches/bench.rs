@@ -52,6 +52,18 @@ macro_rules! bencher {
     };
 }
 
+#[bench]
+fn u128_div_128_64_asymmetric(bencher: &mut Bencher) {
+    let lhs = random::<u128>();
+    let mut rhs = random::<u128>() & (u128::MAX >> 64);
+    if rhs == 0 {
+        rhs = 1;
+    }
+    bencher.iter(|| {
+        black_box(u128_div_asymmetric(black_box(lhs), black_box(rhs)))
+    })
+}
+
 // These simulate the most common cases
 bencher!(
     u32,
