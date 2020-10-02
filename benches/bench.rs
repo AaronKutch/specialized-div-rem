@@ -59,9 +59,7 @@ fn u128_div_128_64_asymmetric(bencher: &mut Bencher) {
     if rhs == 0 {
         rhs = 1;
     }
-    bencher.iter(|| {
-        black_box(u128_div_asymmetric(black_box(lhs), black_box(rhs)))
-    })
+    bencher.iter(|| black_box(u128_div_asymmetric(black_box(lhs), black_box(rhs))))
 }
 
 // These simulate the most common cases
