@@ -1,6 +1,6 @@
 [package]
 name = "specialized-div-rem"
-version = "1.0.0"
+version = "1.0.1"
 authors = ["Aaron Kutch <aaronkutch@att.net>"]
 edition = "2018"
 
@@ -27,7 +27,7 @@ std = []
 
 [dev-dependencies]
 # for random numbers in benchmarks
-rand = "0.7"
+rand = "0.8"
 
 [profile.test]
 # We want to check that no debug assertions are broken. Testing with `opt-level = 0` optimization is
