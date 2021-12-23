@@ -2,7 +2,7 @@
 name = "specialized-div-rem"
 version = "1.0.1"
 authors = ["Aaron Kutch <aaronkutch@att.net>"]
-edition = "2018"
+edition = "2021"
 
 description = "specialized division algorithms for integer primitives"
 documentation = "https://docs.rs/specialized-div-rem"

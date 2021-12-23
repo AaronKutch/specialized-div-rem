@@ -3,7 +3,6 @@
 // `compiler-builtins` which cannot use `memcpy`.
 
 #![cfg_attr(not(feature = "std"), no_std)]
-#![cfg_attr(feature = "asm", feature(asm))]
 
 #[macro_use]
 mod test;
