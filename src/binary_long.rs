@@ -572,7 +572,8 @@ macro_rules! impl_binary_long {
                 ((tmp.1 as $iX) ^ rem_s).wrapping_sub(rem_s),
             )
             */
-
+            // this is problematic because LLVM likes to inline 4 times over
+            /*
             match (duo < 0, div < 0) {
                 (false, false) => {
                     let t = $unsigned_name(duo as $uX, div as $uX);
@@ -591,6 +592,28 @@ macro_rules! impl_binary_long {
                     (t.0 as $iX, (t.1 as $iX).wrapping_neg())
                 },
             }
+            */
+            // this retains the ability of LLVM to eliminate branches
+            let duo_neg = duo < 0;
+            let div_neg = div < 0;
+            let mut duo = duo;
+            let mut div = div;
+            if duo_neg {
+                duo = duo.wrapping_neg();
+            }
+            if div_neg {
+                div = div.wrapping_neg();
+            }
+            let t = $unsigned_name(duo as $uX, div as $uX);
+            let mut quo = t.0 as $iX;
+            let mut rem = t.1 as $iX;
+            if duo_neg {
+                rem = rem.wrapping_neg();
+            }
+            if duo_neg != div_neg {
+                quo = quo.wrapping_neg();
+            }
+            (quo, rem)
         }
     }
 }

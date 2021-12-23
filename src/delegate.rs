@@ -203,24 +203,26 @@ macro_rules! impl_delegate {
             #[$signed_attr]
         )*
         pub fn $signed_name(duo: $iD, div: $iD) -> ($iD, $iD) {
-            match (duo < 0, div < 0) {
-                (false, false) => {
-                    let t = $unsigned_name(duo as $uD, div as $uD);
-                    (t.0 as $iD, t.1 as $iD)
-                },
-                (true, false) => {
-                    let t = $unsigned_name(duo.wrapping_neg() as $uD, div as $uD);
-                    ((t.0 as $iD).wrapping_neg(), (t.1 as $iD).wrapping_neg())
-                },
-                (false, true) => {
-                    let t = $unsigned_name(duo as $uD, div.wrapping_neg() as $uD);
-                    ((t.0 as $iD).wrapping_neg(), t.1 as $iD)
-                },
-                (true, true) => {
-                    let t = $unsigned_name(duo.wrapping_neg() as $uD, div.wrapping_neg() as $uD);
-                    (t.0 as $iD, (t.1 as $iD).wrapping_neg())
-                },
+            let duo_neg = duo < 0;
+            let div_neg = div < 0;
+            let mut duo = duo;
+            let mut div = div;
+            if duo_neg {
+                duo = duo.wrapping_neg();
             }
+            if div_neg {
+                div = div.wrapping_neg();
+            }
+            let t = $unsigned_name(duo as $uD, div as $uD);
+            let mut quo = t.0 as $iD;
+            let mut rem = t.1 as $iD;
+            if duo_neg {
+                rem = rem.wrapping_neg();
+            }
+            if duo_neg != div_neg {
+                quo = quo.wrapping_neg();
+            }
+            (quo, rem)
         }
     }
 }
